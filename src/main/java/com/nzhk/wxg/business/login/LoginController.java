@@ -1,4 +1,4 @@
-package com.nzhk.wxg.login;
+package com.nzhk.wxg.business.login;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
