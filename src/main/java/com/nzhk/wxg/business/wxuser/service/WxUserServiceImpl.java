@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.wxuser.service;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.entity.WxUser;
 import com.nzhk.wxg.mapper.WxUserMapper;
 import jakarta.annotation.Resource;
@@ -16,7 +17,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     private WxUserMapper wxUserMapper;
 
     @Override
-    public void login() {
+    public void login(WxUserLoginReqData wxUserLoginReqData) {
         WxUser wxUser = new WxUser();
         wxUser.setId(UUID.randomUUID().toString());
         wxUser.setOpenid("123");
