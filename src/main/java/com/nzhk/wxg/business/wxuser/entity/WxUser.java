@@ -3,7 +3,6 @@ package com.nzhk.wxg.business.wxuser.entity;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.springframework.context.annotation.Primary;
 
 import java.time.LocalDateTime;
 
