@@ -6,6 +6,7 @@ import com.nzhk.wxg.business.wxuser.entity.WxUser;
 import com.nzhk.wxg.mapper.WxUserMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
     @Resource
     private WxUserMapper wxUserMapper;
+    @Resource
+    private RestTemplate restTemplate;
 
     @Override
     public void login(WxUserLoginReqData wxUserLoginReqData) {
