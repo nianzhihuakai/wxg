@@ -2,6 +2,7 @@ package com.nzhk.wxg.business.wxuser.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
  * 微信小程序用户信息实体类
  */
 @Data
+@Builder
 @TableName("wx_user")
 public class WxUser {
     
