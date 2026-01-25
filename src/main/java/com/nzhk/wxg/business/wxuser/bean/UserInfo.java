@@ -5,9 +5,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class WxUserLoginResData {
+public class UserInfo {
 
-    private String token;
-
-    private UserInfo userInfo;
+    private String userId;
 }

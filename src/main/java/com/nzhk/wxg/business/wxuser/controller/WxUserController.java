@@ -3,6 +3,7 @@ package com.nzhk.wxg.business.wxuser.controller;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.service.IWxUserService;
+import com.nzhk.wxg.common.result.ResultInfo;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,7 +18,7 @@ public class WxUserController {
     private IWxUserService wxUserService;
 
     @PostMapping("login")
-    public WxUserLoginResData login (@RequestBody WxUserLoginReqData wxUserLoginReqData) {
-        return wxUserService.login(wxUserLoginReqData);
+    public ResultInfo login (@RequestBody WxUserLoginReqData wxUserLoginReqData) {
+        return ResultInfo.success(wxUserService.login(wxUserLoginReqData));
     }
 }
