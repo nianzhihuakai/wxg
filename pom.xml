@@ -87,6 +87,13 @@
             <version>4.5.0</version>
             <scope>compile</scope>
         </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/io.swagger/swagger-annotations -->
+        <dependency>
+            <groupId>io.swagger</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <version>1.6.16</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
