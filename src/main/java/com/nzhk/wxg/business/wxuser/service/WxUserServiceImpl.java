@@ -1,10 +1,9 @@
 package com.nzhk.wxg.business.wxuser.service;
 
 import com.alibaba.fastjson.JSONObject;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.nzhk.wxg.business.wxuser.bean.UserInfo;
+import com.nzhk.wxg.common.cache.UserInfo;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.entity.WxUser;
@@ -19,7 +18,6 @@ import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> implements IWxUserService {
@@ -53,7 +51,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", wxUser.getId());
         String token = JwtUtil.generateToken(claims);
-        UserInfo userInfo = UserInfo.builder().userId(wxUser.getId()).build();
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).build();
         return WxUserLoginResData.builder().token(token).userInfo(userInfo).build();
     }
 

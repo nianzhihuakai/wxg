@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nzhk.wxg.mapper.HabitMapper">
-
+    <select id="selectHabitList" resultType="com.nzhk.wxg.business.habit.bean.HabitListResData">
+        select h.*, hci.id checkInId from habit h
+        left join
+        (select * from habit_check_in where user_id = #{userId} and check_in_date = #{nowDate}) hci
+        on h.id = hci.habit_id
+        <where>
+            <if test="habitTypeId != '' and habitTypeId != null">
+                h.habit_type_id = #{habitTypeId}
+            </if>
+        </where>
+    </select>
 </mapper>

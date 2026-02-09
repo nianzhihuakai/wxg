@@ -28,11 +28,11 @@ public class GeneratorTest {
                 )
                 .packageConfig(builder ->
                         builder.parent("com.nzhk.wxg")
-                                .moduleName("generator") // 设置父包模块名
+                                .moduleName("habittype") // 设置父包模块名
                                 .pathInfo(Collections.singletonMap(OutputFile.xml, "E:\\ideaProjects\\wxg1\\src\\main\\resources\\mapper")) // 设置mapperXml生成路径
                 )
                 .strategyConfig(builder ->
-                        builder.addInclude("habit") // 设置需要生成的表名
+                        builder.addInclude("habit_type") // 设置需要生成的表名
                                 .addTablePrefix("t_", "c_") // 设置过滤表前缀
                 )
                 .templateEngine(new FreemarkerTemplateEngine()) // 使用Freemarker引擎模板，默认的是Velocity引擎模板

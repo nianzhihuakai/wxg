@@ -1,25 +1,13 @@
-package com.nzhk.wxg.business.habit.entity;
+package com.nzhk.wxg.business.habit.bean;
 
-import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * <p>
- * 习惯表
- * </p>
- *
- * @author lxy
- * @since 2026-01-28
- */
 @Data
-@ApiModel(value = "Habit对象", description = "习惯表")
-public class Habit implements Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class HabitListResData {
 
     /**
      * 习惯ID
@@ -99,6 +87,13 @@ public class Habit implements Serializable {
     @ApiModelProperty("更新时间(时间戳)")
     private LocalDateTime updateTime;
 
-    private String habitTypeId;
+    private String checkInId;
 
+    private boolean alreadyCheckedInToday;
+
+    private Integer totalCheckInNum = 0;
+
+    private Integer checkInNum = 0;
+
+    private BigDecimal checkInRate = BigDecimal.ZERO;
 }

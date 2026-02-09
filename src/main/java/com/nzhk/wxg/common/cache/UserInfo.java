@@ -1,4 +1,4 @@
-package com.nzhk.wxg.business.wxuser.bean;
+package com.nzhk.wxg.common.cache;
 
 import lombok.Builder;
 import lombok.Data;
@@ -7,5 +7,5 @@ import lombok.Data;
 @Builder
 public class UserInfo {
 
-    private String userId;
+    private String id;
 }

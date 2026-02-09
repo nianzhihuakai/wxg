@@ -1,5 +1,6 @@
 package com.nzhk.wxg.business.wxuser.bean;
 
+import com.nzhk.wxg.common.cache.UserInfo;
 import lombok.Builder;
 import lombok.Data;
 

@@ -1,7 +1,12 @@
 package com.nzhk.wxg.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.nzhk.wxg.business.habit.bean.HabitListResData;
 import com.nzhk.wxg.business.habit.entity.Habit;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * <p>
@@ -13,4 +18,5 @@ import com.nzhk.wxg.business.habit.entity.Habit;
  */
 public interface HabitMapper extends BaseMapper<Habit> {
 
+    List<HabitListResData> selectHabitList(@Param("userId") String userId, @Param("nowDate") LocalDate nowDate, @Param("habitTypeId") String habitTypeId);
 }

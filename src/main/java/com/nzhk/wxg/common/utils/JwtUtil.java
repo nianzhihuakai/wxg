@@ -3,7 +3,6 @@ package com.nzhk.wxg.common.utils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
-import java.util.Date;
 import java.util.Map;
 
 public class JwtUtil {
@@ -14,7 +13,7 @@ public class JwtUtil {
     public static String generateToken(Map<String, Object> claims) {
         return JWT.create()
                 .withClaim("claims", claims)
-                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 12))
+//                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
                 .sign(Algorithm.HMAC256(KEY));
     }
 
