@@ -39,7 +39,7 @@ public class JwtInterceptor implements HandlerInterceptor {
             ResponseUtil.setResponse(response, 500, "登录失效，请重新登录");
         }
 
-        UserInfo userInfo = UserInfo.builder().id((String) userIdObj).build();
+        UserInfo userInfo = UserInfo.builder().id((String) userIdObj).token(token).build();
         ContextCache.setUserInfo(userInfo);
         return true;
     }

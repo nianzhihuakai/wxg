@@ -39,7 +39,7 @@ public class WxUser {
     /**
      * 用户昵称
      */
-    private String nickname;
+    private String nickName;
     
     /**
      * 用户头像URL

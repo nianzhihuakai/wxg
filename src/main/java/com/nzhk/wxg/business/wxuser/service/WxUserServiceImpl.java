@@ -3,11 +3,13 @@ package com.nzhk.wxg.business.wxuser.service;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.nzhk.wxg.common.cache.UserInfo;
+import com.nzhk.wxg.business.wxuser.bean.SaveUserInfoReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.entity.WxUser;
 import com.nzhk.wxg.business.wxuser.vo.WxLoginResVO;
+import com.nzhk.wxg.common.cache.ContextCache;
+import com.nzhk.wxg.common.cache.UserInfo;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.JwtUtil;
 import com.nzhk.wxg.mapper.WxUserMapper;
@@ -51,8 +53,22 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", wxUser.getId());
         String token = JwtUtil.generateToken(claims);
-        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).build();
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(wxUser.getAvatarUrl()).nickName(wxUser.getNickName()).build();
         return WxUserLoginResData.builder().token(token).userInfo(userInfo).build();
+    }
+
+    @Override
+    public WxUserLoginResData saveUserInfo(SaveUserInfoReqData data) {
+        LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        wxUserLambdaUpdateWrapper.eq(WxUser::getId, ContextCache.getUserId())
+                .set(WxUser::getNickName, data.getNickName())
+                .set(WxUser::getAvatarUrl, data.getAvatarUrl());
+        baseMapper.update(null, wxUserLambdaUpdateWrapper);
+
+        WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
+
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(data.getAvatarUrl()).nickName(data.getNickName()).build();
+        return WxUserLoginResData.builder().userInfo(userInfo).build();
     }
 
 

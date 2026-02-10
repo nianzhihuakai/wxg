@@ -8,4 +8,10 @@ import lombok.Data;
 public class UserInfo {
 
     private String id;
+
+    private String nickName;
+
+    private String avatarUrl;
+
+    private String token;
 }
