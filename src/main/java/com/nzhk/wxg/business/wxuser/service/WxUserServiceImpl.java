@@ -1,24 +1,34 @@
 package com.nzhk.wxg.business.wxuser.service;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nzhk.wxg.business.habittype.entity.HabitType;
+import com.nzhk.wxg.business.habittype.service.IHabitTypeService;
 import com.nzhk.wxg.business.wxuser.bean.SaveUserInfoReqData;
+import com.nzhk.wxg.business.wxuser.bean.UserInfoResData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.entity.WxUser;
 import com.nzhk.wxg.business.wxuser.vo.WxLoginResVO;
 import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.cache.UserInfo;
+import com.nzhk.wxg.common.utils.BeanConvertUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.JwtUtil;
+import com.nzhk.wxg.mapper.HabitTypeMapper;
 import com.nzhk.wxg.mapper.WxUserMapper;
 import jakarta.annotation.Resource;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -32,6 +42,10 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     private WxUserMapper wxUserMapper;
     @Resource
     private RestTemplate restTemplate;
+    @Resource
+    private HabitTypeMapper habitTypeMapper;
+    @Resource
+    private IHabitTypeService habitTypeService;
 
     @Override
     public WxUserLoginResData login(WxUserLoginReqData wxUserLoginReqData) {
@@ -41,8 +55,24 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
         WxUser wxUser = wxUserMapper.selectByOpenId(openId);
         if (null == wxUser) {
-            wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
-            wxUserMapper.insert(wxUser);
+            String userId = wxUserLoginReqData.getUserId();
+            if (StringUtils.isEmpty(userId)) {
+                wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
+                wxUserMapper.insert(wxUser);
+            } else {
+                WxUser wxUserSelect = baseMapper.selectById(userId);
+                if (null == wxUserSelect) {
+                    wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
+                    wxUserMapper.insert(wxUser);
+                } else {
+                    wxUser = wxUserSelect;
+                    LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+                    wxUserLambdaUpdateWrapper.eq(WxUser::getId, wxUserSelect.getId())
+                            .set(WxUser::getOpenid, openId);
+                    baseMapper.update(null, wxUserLambdaUpdateWrapper);
+                }
+            }
+
         } else {
             LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
             wxUserLambdaUpdateWrapper.eq(WxUser::getId, wxUser.getId())
@@ -54,6 +84,22 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         claims.put("userId", wxUser.getId());
         String token = JwtUtil.generateToken(claims);
         UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(wxUser.getAvatarUrl()).nickName(wxUser.getNickName()).build();
+
+        LambdaQueryWrapper<HabitType> habitTypeLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        habitTypeLambdaQueryWrapper.eq(HabitType::getUserId, userInfo.getId());
+        List<HabitType> habitTypes = habitTypeMapper.selectList(habitTypeLambdaQueryWrapper);
+        if (CollectionUtils.isEmpty(habitTypes)) {
+            List<String> typeList = Arrays.asList("生活", "健身", "学习");
+            for (int i = 0; i < typeList.size(); i++) {
+                String typeName =  typeList.get(i);
+                HabitType habitType = new HabitType();
+                habitType.setId(IdUtil.getId());
+                habitType.setName(typeName);
+                habitType.setUserId(userInfo.getId());
+                habitType.setSortOrder(i+1);
+                habitTypeMapper.insert(habitType);
+            }
+        }
         return WxUserLoginResData.builder().token(token).userInfo(userInfo).build();
     }
 
@@ -69,6 +115,12 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
         UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(data.getAvatarUrl()).nickName(data.getNickName()).build();
         return WxUserLoginResData.builder().userInfo(userInfo).build();
+    }
+
+    @Override
+    public UserInfoResData getUserInfo() {
+        WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
+        return BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
     }
 
 

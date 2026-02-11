@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.wxuser.controller;
 
 import com.nzhk.wxg.business.wxuser.bean.SaveUserInfoReqData;
+import com.nzhk.wxg.business.wxuser.bean.UserInfoResData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.service.IWxUserService;
@@ -27,5 +28,10 @@ public class WxUserController {
     @PostMapping("saveUserInfo")
     public ResponseInfo<WxUserLoginResData> saveUserInfo (@RequestBody RequestInfo<SaveUserInfoReqData> requestInfo) {
         return ResponseInfo.success(wxUserService.saveUserInfo(requestInfo.getData()));
+    }
+
+    @PostMapping("getUserInfo")
+    public ResponseInfo<UserInfoResData> getUserInfo () {
+        return ResponseInfo.success(wxUserService.getUserInfo());
     }
 }

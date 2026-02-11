@@ -7,6 +7,8 @@ public class WxUserLoginReqData {
 
     private String code;
 
+    private String userId;
+
     private String nickName;
 
     private String avatarUrl;
