@@ -19,6 +19,8 @@ public interface IHabitCheckInService extends IService<HabitCheckIn> {
 
     void checkIn(CheckInReqData data);
 
+    void fillCheckIn(CheckInReqData data);
+
     CheckInDetailResData getWeekCheckInInfo(CheckInDetailReqData data);
 
     CheckInDetailResData getMonthCheckInInfo(CheckInDetailReqData data);

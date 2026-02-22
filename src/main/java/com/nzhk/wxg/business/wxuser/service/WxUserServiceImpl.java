@@ -20,6 +20,7 @@ import com.nzhk.wxg.common.utils.JwtUtil;
 import com.nzhk.wxg.mapper.HabitTypeMapper;
 import com.nzhk.wxg.mapper.WxUserMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -30,7 +31,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+@Slf4j
 @Service
 public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> implements IWxUserService {
 
@@ -54,8 +55,10 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         String sessionKey = loginResVO.getSessionKey();
 
         WxUser wxUser = wxUserMapper.selectByOpenId(openId);
+        log.info("login openId:{}", openId);
         if (null == wxUser) {
             String userId = wxUserLoginReqData.getUserId();
+            log.info("login userId:{}", userId);
             if (StringUtils.isEmpty(userId)) {
                 wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
                 wxUserMapper.insert(wxUser);
@@ -63,9 +66,11 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
                 WxUser wxUserSelect = baseMapper.selectById(userId);
                 if (null == wxUserSelect) {
                     wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
+                    log.info("login wxUser:{}", wxUser.getId());
                     wxUserMapper.insert(wxUser);
                 } else {
                     wxUser = wxUserSelect;
+                    log.info("login wxUserSelect.getId():{}", wxUserSelect.getId());
                     LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
                     wxUserLambdaUpdateWrapper.eq(WxUser::getId, wxUserSelect.getId())
                             .set(WxUser::getOpenid, openId);
@@ -74,6 +79,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
             }
 
         } else {
+            log.info("login wxUser.getId():{}", wxUser.getId());
             LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
             wxUserLambdaUpdateWrapper.eq(WxUser::getId, wxUser.getId())
                     .set(WxUser::getSessionKey, sessionKey).set(WxUser::getUpdateTime, LocalDateTime.now());
@@ -105,6 +111,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
     @Override
     public WxUserLoginResData saveUserInfo(SaveUserInfoReqData data) {
+        log.info("saveUserInfo userId:{}, nickName:{}", ContextCache.getUserId(), data != null ? data.getNickName() : null);
         LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         wxUserLambdaUpdateWrapper.eq(WxUser::getId, ContextCache.getUserId())
                 .set(WxUser::getNickName, data.getNickName())
@@ -119,6 +126,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
     @Override
     public UserInfoResData getUserInfo() {
+        log.info("getUserInfo userId:{}", ContextCache.getUserId());
         WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
         return BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
     }

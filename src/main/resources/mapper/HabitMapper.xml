@@ -7,8 +7,9 @@
         (select * from habit_check_in where user_id = #{userId} and check_in_date = #{nowDate}) hci
         on h.id = hci.habit_id
         <where>
+            h.user_id = #{userId}
             <if test="habitTypeId != '' and habitTypeId != null">
-                h.habit_type_id = #{habitTypeId}
+                and h.habit_type_id = #{habitTypeId}
             </if>
         </where>
     </select>

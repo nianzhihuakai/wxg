@@ -5,6 +5,7 @@ import com.nzhk.wxg.business.habit.service.IHabitService;
 import com.nzhk.wxg.common.info.RequestInfo;
 import com.nzhk.wxg.common.info.ResponseInfo;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +21,7 @@ import java.util.List;
  * @author lxy
  * @since 2026-01-28
  */
+@Slf4j
 @RestController
 @RequestMapping("/habit")
 public class HabitController {
@@ -29,16 +31,19 @@ public class HabitController {
 
     @PostMapping("getHabits")
     public ResponseInfo<List<HabitListResData>> getHabits (@RequestBody RequestInfo<HabitListReqData> requestInfo) {
+        log.info("getHabits request, habitTypeId:{}", requestInfo.getData() != null ? requestInfo.getData().getHabitTypeId() : null);
         return ResponseInfo.success(habitService.getHabits(requestInfo.getData()));
     }
 
     @PostMapping("getHabitById")
     public ResponseInfo<HabitDetailResData> getHabitById (@RequestBody RequestInfo<HabitDetailReqData> requestInfo) {
+        log.info("getHabitById request, id:{}", requestInfo.getData() != null ? requestInfo.getData().getId() : null);
         return ResponseInfo.success(habitService.getHabitById(requestInfo.getData()));
     }
 
     @PostMapping("addHabit")
     public ResponseInfo<Void> addHabit (@RequestBody RequestInfo<AddHabitReqData> requestInfo) {
+        log.info("addHabit request, name:{}, habitTypeId:{}", requestInfo.getData() != null ? requestInfo.getData().getName() : null, requestInfo.getData() != null ? requestInfo.getData().getHabitTypeId() : null);
         habitService.addHabit(requestInfo.getData());
         return ResponseInfo.success(null);
     }

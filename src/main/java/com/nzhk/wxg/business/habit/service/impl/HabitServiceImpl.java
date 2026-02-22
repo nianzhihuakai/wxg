@@ -12,6 +12,7 @@ import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.mapper.HabitCheckInMapper;
 import com.nzhk.wxg.mapper.HabitMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
  * @author lxy
  * @since 2026-01-28
  */
+@Slf4j
 @Service
 public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements IHabitService {
 
@@ -40,6 +42,8 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public List<HabitListResData> getHabits(HabitListReqData data) {
+
+        log.info("getHabits userId:{}", ContextCache.getUserId());
         List<HabitListResData> habits = baseMapper.selectHabitList(ContextCache.getUserId(), LocalDate.now(), data.getHabitTypeId());
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getUserId, ContextCache.getUserId());
@@ -65,6 +69,7 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public HabitDetailResData getHabitById(HabitDetailReqData data) {
+        log.info("getHabitById habitId:{}", data != null ? data.getId() : null);
         Habit habit = baseMapper.selectById(data.getId());
         HabitDetailResData habitDetailResData = BeanConvertUtil.copySingleProperties(habit, HabitDetailResData::new);
 
@@ -87,6 +92,7 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public void addHabit(AddHabitReqData data) {
+        log.info("addHabit userId:{}, name:{}, habitTypeId:{}", ContextCache.getUserId(), data != null ? data.getName() : null, data != null ? data.getHabitTypeId() : null);
         Habit habit = new Habit();
         habit.setId(IdUtil.getId());
         habit.setName(data.getName());

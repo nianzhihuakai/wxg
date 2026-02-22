@@ -8,11 +8,13 @@ import com.nzhk.wxg.business.wxuser.service.IWxUserService;
 import com.nzhk.wxg.common.info.RequestInfo;
 import com.nzhk.wxg.common.info.ResponseInfo;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/user")
 public class WxUserController {
@@ -22,16 +24,19 @@ public class WxUserController {
 
     @PostMapping("login")
     public ResponseInfo login (@RequestBody RequestInfo<WxUserLoginReqData> requestInfo) {
+        log.info("login request");
         return ResponseInfo.success(wxUserService.login(requestInfo.getData()));
     }
 
     @PostMapping("saveUserInfo")
     public ResponseInfo<WxUserLoginResData> saveUserInfo (@RequestBody RequestInfo<SaveUserInfoReqData> requestInfo) {
+        log.info("saveUserInfo request, nickName:{}", requestInfo.getData() != null ? requestInfo.getData().getNickName() : null);
         return ResponseInfo.success(wxUserService.saveUserInfo(requestInfo.getData()));
     }
 
     @PostMapping("getUserInfo")
     public ResponseInfo<UserInfoResData> getUserInfo () {
+        log.info("getUserInfo request");
         return ResponseInfo.success(wxUserService.getUserInfo());
     }
 }

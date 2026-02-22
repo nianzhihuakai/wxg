@@ -1,0 +1,18 @@
+
+server:
+  port: 7001
+  servlet:
+    context-path: /wxg
+
+spring:
+  application:
+    name: wxg
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://182.92.179.169:5432/wxg_pro
+    username: wxg_pro
+    password: KDYiTtzE7diSJGDa
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.nzhk.wxg

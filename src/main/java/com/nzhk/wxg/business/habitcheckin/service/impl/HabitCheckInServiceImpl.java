@@ -15,6 +15,7 @@ import com.nzhk.wxg.common.utils.NzhkDateUtil;
 import com.nzhk.wxg.mapper.HabitCheckInMapper;
 import com.nzhk.wxg.mapper.HabitMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
  * @author lxy
  * @since 2026-02-06
  */
+@Slf4j
 @Service
 public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, HabitCheckIn> implements IHabitCheckInService {
 
@@ -46,6 +49,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Override
     public void checkIn(CheckInReqData data) {
+        log.info("checkIn userId:{}, habitId:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null);
         HabitCheckIn habitCheckIn = new HabitCheckIn();
         habitCheckIn.setId(IdUtil.getId());
         habitCheckIn.setHabitId(data.getHabitId());
@@ -56,7 +60,20 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
     }
 
     @Override
+    public void fillCheckIn(CheckInReqData data) {
+        log.info("fillCheckIn userId:{}, data:{}", ContextCache.getUserId(), data);
+        HabitCheckIn habitCheckIn = new HabitCheckIn();
+        habitCheckIn.setId(IdUtil.getId());
+        habitCheckIn.setHabitId(data.getHabitId());
+        habitCheckIn.setUserId(ContextCache.getUserId());
+        habitCheckIn.setCheckInDate(data.getCheckInDate());
+        habitCheckIn.setCheckInTime(LocalDateTime.of(data.getCheckInDate(), LocalTime.MIN));
+        baseMapper.insert(habitCheckIn);
+    }
+
+    @Override
     public CheckInDetailResData getWeekCheckInInfo(CheckInDetailReqData data) {
+        log.info("getWeekCheckInInfo userId:{}, habitId:{}, weekStart:{}, weekEnd:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getWeekStart() : null, data != null ? data.getWeekEnd() : null);
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper
                 .eq(HabitCheckIn::getUserId, ContextCache.getUserId())
@@ -79,6 +96,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Override
     public CheckInDetailResData getMonthCheckInInfo(CheckInDetailReqData data) {
+        log.info("getMonthCheckInInfo userId:{}, habitId:{}, monthDate:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getMonthDate() : null);
         LocalDate monthStartDate = data.getMonthDate();
         LocalDate monthEndDate = monthStartDate.plusMonths(1).minusDays(1);
         int dayOfMonth = monthEndDate.getDayOfMonth();
@@ -103,6 +121,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Override
     public CheckInDetailResData getYearCheckInInfo(CheckInDetailReqData data) {
+        log.info("getYearCheckInInfo userId:{}, habitId:{}, yearDate:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getYearDate() : null);
         LocalDate yearStartDate = data.getYearDate();
         LocalDate yearEndDate = yearStartDate.plusYears(1).minusDays(1);
         int dayOfYear = yearEndDate.getDayOfYear();
@@ -127,6 +146,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Override
     public StatisticsInfoResData getStatisticsInfo() {
+        log.info("getStatisticsInfo userId:{}", ContextCache.getUserId());
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getUserId, ContextCache.getUserId());
         List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);

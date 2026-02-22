@@ -5,6 +5,7 @@ import com.nzhk.wxg.common.info.ResponseInfo;
 import com.nzhk.wxg.feedback.bean.SaveFeedbackReqData;
 import com.nzhk.wxg.feedback.service.IFeedbackService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author lxy
  * @since 2026-02-11
  */
+@Slf4j
 @RestController
 @RequestMapping("/feedback")
 public class FeedbackController {
@@ -27,6 +29,7 @@ public class FeedbackController {
 
     @PostMapping("saveFeedback")
     public ResponseInfo<Void> saveFeedback (@RequestBody RequestInfo<SaveFeedbackReqData> requestInfo) {
+        log.info("saveFeedback request, content length:{}", requestInfo.getData() != null && requestInfo.getData().getContent() != null ? requestInfo.getData().getContent().length() : 0);
         feedbackService.saveFeedback(requestInfo.getData());
         return ResponseInfo.success(null);
     }

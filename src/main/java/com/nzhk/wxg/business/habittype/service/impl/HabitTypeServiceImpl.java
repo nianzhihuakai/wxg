@@ -11,6 +11,7 @@ import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.utils.BeanConvertUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.mapper.HabitTypeMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,11 +24,13 @@ import java.util.List;
  * @author lxy
  * @since 2026-02-07
  */
+@Slf4j
 @Service
 public class HabitTypeServiceImpl extends ServiceImpl<HabitTypeMapper, HabitType> implements IHabitTypeService {
 
     @Override
     public List<HabitType> getHabitTypes(HabitTypeListReqData data) {
+        log.info("getHabitTypes userId:{}", ContextCache.getUserId());
         LambdaQueryWrapper<HabitType> habitTypeLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitTypeLambdaQueryWrapper.eq(HabitType::getUserId, ContextCache.getUserId());
         return baseMapper.selectList(habitTypeLambdaQueryWrapper);
@@ -35,7 +38,7 @@ public class HabitTypeServiceImpl extends ServiceImpl<HabitTypeMapper, HabitType
 
     @Override
     public void addHabitType(UpdateHabitTypeReqData data) {
-
+        log.info("addHabitType userId:{}, name:{}", ContextCache.getUserId(), data != null ? data.getName() : null);
         LambdaQueryWrapper<HabitType> habitTypeLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitTypeLambdaQueryWrapper.eq(HabitType::getUserId, ContextCache.getUserId());
         List<HabitType> habitTypes = baseMapper.selectList(habitTypeLambdaQueryWrapper);
@@ -49,11 +52,13 @@ public class HabitTypeServiceImpl extends ServiceImpl<HabitTypeMapper, HabitType
 
     @Override
     public void deleteHabitType(UpdateHabitTypeReqData data) {
+        log.info("deleteHabitType userId:{}, id:{}", ContextCache.getUserId(), data != null ? data.getId() : null);
         baseMapper.deleteById(data.getId());
     }
 
     @Override
     public void updateHabitTypeOrder(UpdateHabitTypeReqData data) {
+        log.info("updateHabitTypeOrder userId:{}, orderedIds size:{}", ContextCache.getUserId(), data != null && data.getOrderedIds() != null ? data.getOrderedIds().size() : 0);
         List<String> orderedIds = data.getOrderedIds();
         for (int i = 0; i < orderedIds.size(); i++) {
             String orderedId =  orderedIds.get(i);
@@ -67,6 +72,7 @@ public class HabitTypeServiceImpl extends ServiceImpl<HabitTypeMapper, HabitType
 
     @Override
     public void updateHabitType(UpdateHabitTypeReqData data) {
+        log.info("updateHabitType userId:{}, id:{}, name:{}", ContextCache.getUserId(), data != null ? data.getId() : null, data != null ? data.getName() : null);
         LambdaUpdateWrapper<HabitType> habitTypeLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         habitTypeLambdaUpdateWrapper.eq(HabitType::getId, data.getId())
                 .set(HabitType::getName, data.getName())
