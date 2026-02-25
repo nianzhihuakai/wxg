@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.habit.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nzhk.wxg.business.habit.bean.*;
 import com.nzhk.wxg.business.habit.entity.Habit;
@@ -99,5 +100,22 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setHabitTypeId(data.getHabitTypeId());
         habit.setUserId(ContextCache.getUserId());
         baseMapper.insert(habit);
+    }
+
+    @Override
+    public void updateHabit(UpdateHabitReqData data) {
+        LambdaUpdateWrapper<Habit> habitLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        habitLambdaUpdateWrapper.eq(Habit::getId, data.getHabitId())
+                .set(Habit::getHabitTypeId, data.getHabitTypeId())
+                .set(Habit::getName, data.getName());
+        baseMapper.update(habitLambdaUpdateWrapper);
+    }
+
+    @Override
+    public void deleteHabit(UpdateHabitReqData data) {
+        LambdaUpdateWrapper<HabitCheckIn> habitCheckInLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        habitCheckInLambdaUpdateWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId());
+        habitCheckInMapper.delete(habitCheckInLambdaUpdateWrapper);
+        baseMapper.deleteById(data.getHabitId());
     }
 }

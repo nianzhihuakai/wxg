@@ -47,4 +47,18 @@ public class HabitController {
         habitService.addHabit(requestInfo.getData());
         return ResponseInfo.success(null);
     }
+
+    @PostMapping("updateHabit")
+    public ResponseInfo<Void> updateHabit (@RequestBody RequestInfo<UpdateHabitReqData> requestInfo) {
+        log.info("updateHabit request:{}", requestInfo.getData());
+        habitService.updateHabit(requestInfo.getData());
+        return ResponseInfo.success(null);
+    }
+
+    @PostMapping("deleteHabit")
+    public ResponseInfo<Void> deleteHabit (@RequestBody RequestInfo<UpdateHabitReqData> requestInfo) {
+        log.info("deleteHabit request:{}", requestInfo.getData());
+        habitService.deleteHabit(requestInfo.getData());
+        return ResponseInfo.success(null);
+    }
 }

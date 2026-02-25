@@ -87,6 +87,8 @@ public class HabitDetailResData {
     @ApiModelProperty("更新时间(时间戳)")
     private LocalDateTime updateTime;
 
+    private String habitTypeId;
+
     private Integer totalCheckInNum = 0;
 
     private Integer checkInNum = 0;

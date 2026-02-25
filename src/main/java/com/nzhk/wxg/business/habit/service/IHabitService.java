@@ -21,4 +21,8 @@ public interface IHabitService extends IService<Habit> {
     HabitDetailResData getHabitById(HabitDetailReqData data);
 
     void addHabit(AddHabitReqData data);
+
+    void updateHabit(UpdateHabitReqData data);
+
+    void deleteHabit(UpdateHabitReqData data);
 }
