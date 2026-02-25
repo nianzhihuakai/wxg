@@ -10,4 +10,6 @@ public class CheckInReqData {
     private String habitId;
 
     private LocalDate checkInDate;
+
+    private Integer fillCheckInStatus;
 }

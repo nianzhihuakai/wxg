@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.habitcheckin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nzhk.wxg.business.habit.entity.Habit;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
@@ -62,13 +63,23 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
     @Override
     public void fillCheckIn(CheckInReqData data) {
         log.info("fillCheckIn userId:{}, data:{}", ContextCache.getUserId(), data);
-        HabitCheckIn habitCheckIn = new HabitCheckIn();
-        habitCheckIn.setId(IdUtil.getId());
-        habitCheckIn.setHabitId(data.getHabitId());
-        habitCheckIn.setUserId(ContextCache.getUserId());
-        habitCheckIn.setCheckInDate(data.getCheckInDate());
-        habitCheckIn.setCheckInTime(LocalDateTime.of(data.getCheckInDate(), LocalTime.MIN));
-        baseMapper.insert(habitCheckIn);
+        Integer fillCheckInStatus = data.getFillCheckInStatus();
+        if (null == fillCheckInStatus || 1 == fillCheckInStatus) {
+            HabitCheckIn habitCheckIn = new HabitCheckIn();
+            habitCheckIn.setId(IdUtil.getId());
+            habitCheckIn.setHabitId(data.getHabitId());
+            habitCheckIn.setUserId(ContextCache.getUserId());
+            habitCheckIn.setCheckInDate(data.getCheckInDate());
+            habitCheckIn.setCheckInTime(LocalDateTime.of(data.getCheckInDate(), LocalTime.MIN));
+            baseMapper.insert(habitCheckIn);
+        } else {
+            LambdaUpdateWrapper<HabitCheckIn> habitCheckInLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+            habitCheckInLambdaUpdateWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId())
+                    .eq(HabitCheckIn::getCheckInDate, data.getCheckInDate())
+                    .eq(HabitCheckIn::getUserId, ContextCache.getUserId());
+            baseMapper.delete(habitCheckInLambdaUpdateWrapper);
+        }
+
     }
 
     @Override
