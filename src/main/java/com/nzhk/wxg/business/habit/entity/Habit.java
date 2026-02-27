@@ -5,6 +5,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -100,5 +101,11 @@ public class Habit implements Serializable {
     private LocalDateTime updateTime;
 
     private String habitTypeId;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
+
+    private LocalDateTime archiveDateTime;
 
 }

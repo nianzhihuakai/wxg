@@ -35,6 +35,12 @@ public class HabitController {
         return ResponseInfo.success(habitService.getHabits(requestInfo.getData()));
     }
 
+    @PostMapping("getArchiveHabits")
+    public ResponseInfo<List<HabitListResData>> getArchiveHabits (@RequestBody RequestInfo<HabitListReqData> requestInfo) {
+        log.info("getArchiveHabits request, requestInfo:{}", requestInfo.getData());
+        return ResponseInfo.success(habitService.getArchiveHabits(requestInfo.getData()));
+    }
+
     @PostMapping("getHabitById")
     public ResponseInfo<HabitDetailResData> getHabitById (@RequestBody RequestInfo<HabitDetailReqData> requestInfo) {
         log.info("getHabitById request, id:{}", requestInfo.getData() != null ? requestInfo.getData().getId() : null);
@@ -43,7 +49,7 @@ public class HabitController {
 
     @PostMapping("addHabit")
     public ResponseInfo<Void> addHabit (@RequestBody RequestInfo<AddHabitReqData> requestInfo) {
-        log.info("addHabit request, name:{}, habitTypeId:{}", requestInfo.getData() != null ? requestInfo.getData().getName() : null, requestInfo.getData() != null ? requestInfo.getData().getHabitTypeId() : null);
+        log.info("addHabit request, data:{}", requestInfo.getData());
         habitService.addHabit(requestInfo.getData());
         return ResponseInfo.success(null);
     }
@@ -52,6 +58,13 @@ public class HabitController {
     public ResponseInfo<Void> updateHabit (@RequestBody RequestInfo<UpdateHabitReqData> requestInfo) {
         log.info("updateHabit request:{}", requestInfo.getData());
         habitService.updateHabit(requestInfo.getData());
+        return ResponseInfo.success(null);
+    }
+
+    @PostMapping("archiveHabit")
+    public ResponseInfo<Void> archiveHabit (@RequestBody RequestInfo<UpdateHabitReqData> requestInfo) {
+        log.info("archiveHabit request:{}", requestInfo.getData());
+        habitService.archiveHabit(requestInfo.getData());
         return ResponseInfo.success(null);
     }
 

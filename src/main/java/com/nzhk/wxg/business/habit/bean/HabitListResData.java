@@ -4,6 +4,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -86,6 +87,10 @@ public class HabitListResData {
      */
     @ApiModelProperty("更新时间(时间戳)")
     private LocalDateTime updateTime;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
 
     private String checkInId;
 

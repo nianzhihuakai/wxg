@@ -19,4 +19,6 @@ import java.util.List;
 public interface HabitMapper extends BaseMapper<Habit> {
 
     List<HabitListResData> selectHabitList(@Param("userId") String userId, @Param("nowDate") LocalDate nowDate, @Param("habitTypeId") String habitTypeId);
+
+    List<HabitListResData> selectArchiveHabitList(String userId, LocalDate now, String habitTypeId);
 }

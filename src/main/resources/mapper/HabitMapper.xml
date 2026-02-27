@@ -7,7 +7,16 @@
         (select * from habit_check_in where user_id = #{userId} and check_in_date = #{nowDate}) hci
         on h.id = hci.habit_id
         <where>
-            h.user_id = #{userId}
+            h.user_id = #{userId} and status = 1
+            <if test="habitTypeId != '' and habitTypeId != null">
+                and h.habit_type_id = #{habitTypeId}
+            </if>
+        </where>
+    </select>
+    <select id="selectArchiveHabitList" resultType="com.nzhk.wxg.business.habit.bean.HabitListResData">
+        select h.* from habit h
+        <where>
+            h.user_id = #{userId} and h.status = 2
             <if test="habitTypeId != '' and habitTypeId != null">
                 and h.habit_type_id = #{habitTypeId}
             </if>

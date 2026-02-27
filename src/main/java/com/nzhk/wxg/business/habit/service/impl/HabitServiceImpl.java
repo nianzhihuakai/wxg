@@ -21,6 +21,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,13 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
     }
 
     @Override
+    public List<HabitListResData> getArchiveHabits(HabitListReqData data) {
+        log.info("getArchiveHabits userId:{}", ContextCache.getUserId());
+        List<HabitListResData> habits = baseMapper.selectArchiveHabitList(ContextCache.getUserId(), LocalDate.now(), data.getHabitTypeId());
+        return habits;
+    }
+
+    @Override
     public HabitDetailResData getHabitById(HabitDetailReqData data) {
         log.info("getHabitById habitId:{}", data != null ? data.getId() : null);
         Habit habit = baseMapper.selectById(data.getId());
@@ -99,6 +107,8 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setName(data.getName());
         habit.setHabitTypeId(data.getHabitTypeId());
         habit.setUserId(ContextCache.getUserId());
+        habit.setStartDate(data.getStartDate());
+        habit.setEndDate(data.getEndDate());
         baseMapper.insert(habit);
     }
 
@@ -107,7 +117,18 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         LambdaUpdateWrapper<Habit> habitLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         habitLambdaUpdateWrapper.eq(Habit::getId, data.getHabitId())
                 .set(Habit::getHabitTypeId, data.getHabitTypeId())
-                .set(Habit::getName, data.getName());
+                .set(Habit::getName, data.getName())
+                .set(Habit::getStartDate, data.getStartDate())
+                .set(Habit::getEndDate, data.getEndDate());
+        baseMapper.update(habitLambdaUpdateWrapper);
+    }
+
+    @Override
+    public void archiveHabit(UpdateHabitReqData data) {
+        LambdaUpdateWrapper<Habit> habitLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        habitLambdaUpdateWrapper.eq(Habit::getId, data.getHabitId())
+                .set(Habit::getStatus, 2)
+                .set(Habit::getArchiveDateTime, LocalDateTime.now());
         baseMapper.update(habitLambdaUpdateWrapper);
     }
 
