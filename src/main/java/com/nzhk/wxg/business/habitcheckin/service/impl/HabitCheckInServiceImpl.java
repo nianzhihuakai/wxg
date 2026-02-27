@@ -27,10 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -96,10 +93,11 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);
         CheckInDetailResData checkInDetailResData = new CheckInDetailResData();
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
-            checkInDetailResData.setCheckInNum(habitCheckIns.size());
+            int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
+            checkInDetailResData.setCheckInNum(checkInNum);
             int totalDays = 7;
             checkInDetailResData.setTotalCheckInNum(totalDays);
-            checkInDetailResData.setCheckInRate(new BigDecimal(habitCheckIns.size()).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
         }
         return checkInDetailResData;
@@ -122,9 +120,10 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);
         CheckInDetailResData checkInDetailResData = new CheckInDetailResData();
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
-            checkInDetailResData.setCheckInNum(habitCheckIns.size());
+            int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
+            checkInDetailResData.setCheckInNum(checkInNum);
             checkInDetailResData.setTotalCheckInNum(dayOfMonth);
-            checkInDetailResData.setCheckInRate(new BigDecimal(habitCheckIns.size()).divide(new BigDecimal(dayOfMonth),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(dayOfMonth),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
         }
         return checkInDetailResData;
@@ -147,9 +146,10 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);
         CheckInDetailResData checkInDetailResData = new CheckInDetailResData();
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
-            checkInDetailResData.setCheckInNum(habitCheckIns.size());
+            int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
+            checkInDetailResData.setCheckInNum(checkInNum);
             checkInDetailResData.setTotalCheckInNum(dayOfYear);
-            checkInDetailResData.setCheckInRate(new BigDecimal(habitCheckIns.size()).divide(new BigDecimal(dayOfYear),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(dayOfYear),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
         }
         return checkInDetailResData;
