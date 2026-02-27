@@ -10,4 +10,6 @@ public class UserInfoResData {
     private String id;
 
     private LocalDateTime createTime;
+
+    private String versionNo = "1.1.0";
 }
