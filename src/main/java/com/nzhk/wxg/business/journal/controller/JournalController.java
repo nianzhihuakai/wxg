@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.journal.controller;
 
 import com.nzhk.wxg.business.journal.bean.JournalDetailResData;
+import com.nzhk.wxg.business.journal.bean.JournalListResData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveReqData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveResData;
 import com.nzhk.wxg.business.journal.service.IJournalService;
@@ -52,6 +53,23 @@ public class JournalController {
             return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
         } catch (Exception e) {
             log.error("journal getByDate system error", e);
+            return ResponseInfo.fail(50000, "服务器异常", null);
+        }
+    }
+
+    @GetMapping("/list")
+    public ResponseInfo<JournalListResData> list(@RequestParam("month") String month,
+                                                 @RequestParam("pageNo") Integer pageNo,
+                                                 @RequestParam("pageSize") Integer pageSize) {
+        try {
+            String userId = ContextCache.getUserId();
+            log.info("journal list request, userId:{}, month:{}, pageNo:{}, pageSize:{}", userId, month, pageNo, pageSize);
+            JournalListResData resData = journalService.list(userId, month, pageNo, pageSize);
+            return ResponseInfo.success(resData);
+        } catch (BizException e) {
+            return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("journal list system error", e);
             return ResponseInfo.fail(50000, "服务器异常", null);
         }
     }

@@ -7,6 +7,8 @@ import com.nzhk.wxg.business.file.service.IFileService;
 import com.nzhk.wxg.business.journal.bean.JournalDetailResData;
 import com.nzhk.wxg.business.journal.bean.JournalImageReqData;
 import com.nzhk.wxg.business.journal.bean.JournalImageResData;
+import com.nzhk.wxg.business.journal.bean.JournalHistoryItemResData;
+import com.nzhk.wxg.business.journal.bean.JournalListResData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveReqData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveResData;
 import com.nzhk.wxg.business.journal.entity.Journal;
@@ -28,8 +30,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -127,6 +133,60 @@ public class JournalServiceImpl implements IJournalService {
         return resData;
     }
 
+    @Override
+    public JournalListResData list(String userId, String month, Integer pageNo, Integer pageSize) {
+        LocalDate monthStart = parseMonthStart(month);
+        validatePage(pageNo, pageSize);
+        LocalDate nextMonthStart = monthStart.plusMonths(1);
+        int offset = (pageNo - 1) * pageSize;
+
+        LambdaQueryWrapper<Journal> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(Journal::getUserId, userId)
+                .eq(Journal::getStatus, 1)
+                .ge(Journal::getJournalDate, monthStart)
+                .lt(Journal::getJournalDate, nextMonthStart);
+        Long total = journalMapper.selectCount(countWrapper);
+        if (total == null) {
+            total = 0L;
+        }
+
+        List<JournalHistoryItemResData> records = new ArrayList<>();
+        if (total > 0) {
+            LambdaQueryWrapper<Journal> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Journal::getUserId, userId)
+                    .eq(Journal::getStatus, 1)
+                    .ge(Journal::getJournalDate, monthStart)
+                    .lt(Journal::getJournalDate, nextMonthStart)
+                    .orderByDesc(Journal::getJournalDate)
+                    .orderByDesc(Journal::getUpdatedAt)
+                    .last("limit " + pageSize + " offset " + offset);
+            List<Journal> journals = journalMapper.selectList(wrapper);
+            if (!CollectionUtils.isEmpty(journals)) {
+                Map<String, List<JournalImageResData>> imageMap = queryImageMap(userId, journals);
+                for (Journal journal : journals) {
+                    JournalHistoryItemResData item = new JournalHistoryItemResData();
+                    item.setJournalId(journal.getId());
+                    item.setDate(journal.getJournalDate().format(DATE_FORMATTER));
+                    item.setMoodValue(journal.getMoodValue());
+                    item.setMoodLabel(journal.getMoodLabel());
+                    item.setSubject(journal.getSubject());
+                    item.setContent(journal.getContent());
+                    item.setUpdatedAt(journal.getUpdatedAt() == null ? null : journal.getUpdatedAt().toString());
+                    item.setImages(imageMap.getOrDefault(journal.getId(), Collections.emptyList()));
+                    records.add(item);
+                }
+            }
+        }
+
+        JournalListResData resData = new JournalListResData();
+        resData.setPageNo(pageNo);
+        resData.setPageSize(pageSize);
+        resData.setTotal(total);
+        resData.setHasMore((long) pageNo * pageSize < total);
+        resData.setRecords(records);
+        return resData;
+    }
+
     private void validateSaveRequest(JournalSaveReqData data) {
         if (data == null) {
             throw new BizException(40000, "请求体不能为空");
@@ -159,6 +219,26 @@ public class JournalServiceImpl implements IJournalService {
             return LocalDate.parse(date, DATE_FORMATTER);
         } catch (DateTimeParseException e) {
             throw new BizException(40000, "date 格式错误，需为 yyyy-MM-dd");
+        }
+    }
+
+    private LocalDate parseMonthStart(String month) {
+        if (StringUtils.isBlank(month)) {
+            throw new BizException(40000, "month 不能为空");
+        }
+        try {
+            return LocalDate.parse(month + "-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } catch (DateTimeParseException e) {
+            throw new BizException(40000, "month 格式错误，应为 yyyy-MM");
+        }
+    }
+
+    private void validatePage(Integer pageNo, Integer pageSize) {
+        if (pageNo == null || pageNo <= 0) {
+            throw new BizException(40000, "pageNo 必须从 1 开始");
+        }
+        if (pageSize == null || pageSize <= 0 || pageSize > 100) {
+            throw new BizException(40000, "pageSize 范围应为 1~100");
         }
     }
 
@@ -255,5 +335,30 @@ public class JournalServiceImpl implements IJournalService {
             resData.setUpdatedAt(updatedAt.toString());
         }
         return resData;
+    }
+
+    private Map<String, List<JournalImageResData>> queryImageMap(String userId, List<Journal> journals) {
+        List<String> journalIds = journals.stream().map(Journal::getId).collect(Collectors.toList());
+        LambdaQueryWrapper<JournalImage> imageWrapper = new LambdaQueryWrapper<>();
+        imageWrapper.eq(JournalImage::getUserId, userId)
+                .eq(JournalImage::getStatus, 1)
+                .in(JournalImage::getJournalId, journalIds)
+                .orderByAsc(JournalImage::getSortOrder)
+                .orderByAsc(JournalImage::getId);
+        List<JournalImage> journalImages = journalImageMapper.selectList(imageWrapper);
+        Map<String, List<JournalImageResData>> imageMap = new HashMap<>();
+        if (CollectionUtils.isEmpty(journalImages)) {
+            return imageMap;
+        }
+        for (JournalImage image : journalImages) {
+            JournalImageResData imageResData = new JournalImageResData();
+            imageResData.setFileId(image.getFileId());
+            imageResData.setUrl(image.getImageUrl());
+            imageResData.setSort(image.getSortOrder());
+            imageResData.setWidth(image.getWidth());
+            imageResData.setHeight(image.getHeight());
+            imageMap.computeIfAbsent(image.getJournalId(), k -> new ArrayList<>()).add(imageResData);
+        }
+        return imageMap;
     }
 }
