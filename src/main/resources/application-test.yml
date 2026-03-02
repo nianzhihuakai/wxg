@@ -19,5 +19,5 @@ mybatis-plus:
 
 wxg:
   file:
-    storage-dir: uploads
+    storage-dir: E:/data/wxg/uploads
     base-url: /wxg/file/access/

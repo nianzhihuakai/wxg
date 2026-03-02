@@ -60,4 +60,6 @@ public class HabitCheckIn implements Serializable {
     @ApiModelProperty("创建时间(时间戳)")
     private LocalDateTime createTime;
 
+    @ApiModelProperty("打卡类型 1-普通打卡 2-补卡")
+    private Integer checkInType;
 }

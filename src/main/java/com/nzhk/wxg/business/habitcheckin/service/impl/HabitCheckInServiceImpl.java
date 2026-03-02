@@ -54,6 +54,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         habitCheckIn.setUserId(ContextCache.getUserId());
         habitCheckIn.setCheckInDate(LocalDate.now());
         habitCheckIn.setCheckInTime(LocalDateTime.now());
+        habitCheckIn.setCheckInType(1);
         baseMapper.insert(habitCheckIn);
     }
 
@@ -62,13 +63,25 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         log.info("fillCheckIn userId:{}, data:{}", ContextCache.getUserId(), data);
         Integer fillCheckInStatus = data.getFillCheckInStatus();
         if (null == fillCheckInStatus || 1 == fillCheckInStatus) {
-            HabitCheckIn habitCheckIn = new HabitCheckIn();
-            habitCheckIn.setId(IdUtil.getId());
-            habitCheckIn.setHabitId(data.getHabitId());
-            habitCheckIn.setUserId(ContextCache.getUserId());
-            habitCheckIn.setCheckInDate(data.getCheckInDate());
-            habitCheckIn.setCheckInTime(LocalDateTime.of(data.getCheckInDate(), LocalTime.MIN));
-            baseMapper.insert(habitCheckIn);
+            LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
+            habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getUserId, ContextCache.getUserId())
+                    .eq(HabitCheckIn::getHabitId, data.getHabitId())
+                    .eq(HabitCheckIn::getCheckInDate, data.getCheckInDate());
+            List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);
+            if (habitCheckIns.isEmpty()) {
+                HabitCheckIn habitCheckIn = new HabitCheckIn();
+                habitCheckIn.setId(IdUtil.getId());
+                habitCheckIn.setHabitId(data.getHabitId());
+                habitCheckIn.setUserId(ContextCache.getUserId());
+                habitCheckIn.setCheckInDate(data.getCheckInDate());
+                habitCheckIn.setCheckInType(data.getCheckInType());
+                if (1 == data.getCheckInType()) {
+                    habitCheckIn.setCheckInTime(LocalDateTime.now());
+                } else {
+                    habitCheckIn.setCheckInTime(LocalDateTime.of(data.getCheckInDate(), LocalTime.MIN));
+                }
+                baseMapper.insert(habitCheckIn);
+            }
         } else {
             LambdaUpdateWrapper<HabitCheckIn> habitCheckInLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
             habitCheckInLambdaUpdateWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId())
