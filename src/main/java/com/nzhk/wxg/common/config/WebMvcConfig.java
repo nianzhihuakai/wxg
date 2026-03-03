@@ -17,7 +17,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns("/**/login/**")
-                .excludePathPatterns("/file/access/**");
+                .excludePathPatterns("/file/access/**")
+                .excludePathPatterns("/revice", "/revice/**");
     }
 
     @Override
