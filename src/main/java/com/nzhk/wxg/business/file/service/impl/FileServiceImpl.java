@@ -24,9 +24,12 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+
+import org.springframework.util.CollectionUtils;
 
 @Slf4j
 @Service
@@ -123,6 +126,16 @@ public class FileServiceImpl implements IFileService {
         LambdaQueryWrapper<UploadedFile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UploadedFile::getFileId, fileId).eq(UploadedFile::getStatus, 1);
         return uploadedFileMapper.selectOne(wrapper);
+    }
+
+    @Override
+    public void deleteByFileIds(List<String> fileIds) {
+        if (CollectionUtils.isEmpty(fileIds)) {
+            return;
+        }
+        LambdaQueryWrapper<UploadedFile> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(UploadedFile::getFileId, fileIds);
+        uploadedFileMapper.delete(wrapper);
     }
 
     private String getExtension(String fileName) {

@@ -1,5 +1,6 @@
 package com.nzhk.wxg.business.journal.service;
 
+import com.nzhk.wxg.business.journal.bean.JournalDeleteReqData;
 import com.nzhk.wxg.business.journal.bean.JournalDetailResData;
 import com.nzhk.wxg.business.journal.bean.JournalListResData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveReqData;
@@ -12,4 +13,6 @@ public interface IJournalService {
     JournalDetailResData getByDate(String userId, String date);
 
     JournalListResData list(String userId, String month, Integer pageNo, Integer pageSize);
+
+    void delete(String userId, JournalDeleteReqData data);
 }

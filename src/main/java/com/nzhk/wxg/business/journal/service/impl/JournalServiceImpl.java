@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.nzhk.wxg.business.file.entity.UploadedFile;
 import com.nzhk.wxg.business.file.service.IFileService;
+import com.nzhk.wxg.business.journal.bean.JournalDeleteReqData;
 import com.nzhk.wxg.business.journal.bean.JournalDetailResData;
 import com.nzhk.wxg.business.journal.bean.JournalImageReqData;
 import com.nzhk.wxg.business.journal.bean.JournalImageResData;
@@ -187,6 +188,30 @@ public class JournalServiceImpl implements IJournalService {
         return resData;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(String userId, JournalDeleteReqData data) {
+        if (data == null || StringUtils.isBlank(data.getJournalId())) {
+            throw new BizException(40000, "journalId 不能为空");
+        }
+        String journalId = data.getJournalId();
+        Journal journal = findTargetJournal(userId, null, journalId);
+        if (journal == null) {
+            throw new BizException(40400, "日记不存在");
+        }
+        LambdaQueryWrapper<JournalImage> imageQueryWrapper = new LambdaQueryWrapper<>();
+        imageQueryWrapper.eq(JournalImage::getJournalId, journalId).eq(JournalImage::getUserId, userId);
+        List<JournalImage> toDeleteImages = journalImageMapper.selectList(imageQueryWrapper);
+        List<String> fileIds = toDeleteImages.stream()
+                .map(JournalImage::getFileId)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        journalImageMapper.delete(imageQueryWrapper);
+        journalMapper.deleteById(journalId);
+        fileService.deleteByFileIds(fileIds);
+    }
+
     private void validateSaveRequest(JournalSaveReqData data) {
         if (data == null) {
             throw new BizException(40000, "请求体不能为空");
@@ -284,12 +309,16 @@ public class JournalServiceImpl implements IJournalService {
     }
 
     private void replaceJournalImages(String userId, String journalId, List<JournalImageReqData> images) {
-        LambdaUpdateWrapper<JournalImage> deleteWrapper = new LambdaUpdateWrapper<>();
-        deleteWrapper.eq(JournalImage::getJournalId, journalId)
-                .eq(JournalImage::getUserId, userId)
-                .eq(JournalImage::getStatus, 1)
-                .set(JournalImage::getStatus, 0);
-        journalImageMapper.update(null, deleteWrapper);
+        LambdaQueryWrapper<JournalImage> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(JournalImage::getJournalId, journalId).eq(JournalImage::getUserId, userId);
+        List<JournalImage> toDeleteImages = journalImageMapper.selectList(queryWrapper);
+        List<String> fileIds = toDeleteImages.stream()
+                .map(JournalImage::getFileId)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        journalImageMapper.delete(queryWrapper);
+        fileService.deleteByFileIds(fileIds);
 
         if (CollectionUtils.isEmpty(images)) {
             return;

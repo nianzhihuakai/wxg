@@ -1,5 +1,6 @@
 package com.nzhk.wxg.business.journal.controller;
 
+import com.nzhk.wxg.business.journal.bean.JournalDeleteReqData;
 import com.nzhk.wxg.business.journal.bean.JournalDetailResData;
 import com.nzhk.wxg.business.journal.bean.JournalListResData;
 import com.nzhk.wxg.business.journal.bean.JournalSaveReqData;
@@ -70,6 +71,22 @@ public class JournalController {
             return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
         } catch (Exception e) {
             log.error("journal list system error", e);
+            return ResponseInfo.fail(50000, "服务器异常", null);
+        }
+    }
+
+    @PostMapping("/delete")
+    public ResponseInfo<Void> delete(@RequestBody RequestInfo<JournalDeleteReqData> requestInfo) {
+        try {
+            String userId = ContextCache.getUserId();
+            JournalDeleteReqData data = requestInfo != null ? requestInfo.getData() : null;
+            log.info("journal delete request, userId:{}, journalId:{}", userId, data != null ? data.getJournalId() : null);
+            journalService.delete(userId, data);
+            return ResponseInfo.success(null);
+        } catch (BizException e) {
+            return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("journal delete system error", e);
             return ResponseInfo.fail(50000, "服务器异常", null);
         }
     }

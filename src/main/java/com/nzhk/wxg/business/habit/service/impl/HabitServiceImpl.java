@@ -139,4 +139,16 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habitCheckInMapper.delete(habitCheckInLambdaUpdateWrapper);
         baseMapper.deleteById(data.getHabitId());
     }
+
+    @Override
+    public void autoArchiveEndedHabits() {
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDateTime now = LocalDateTime.now();
+        LambdaUpdateWrapper<Habit> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Habit::getEndDate, yesterday)
+                .eq(Habit::getStatus, 1)
+                .set(Habit::getStatus, 2)
+                .set(Habit::getArchiveDateTime, now);
+        baseMapper.update(null, updateWrapper);
+    }
 }
