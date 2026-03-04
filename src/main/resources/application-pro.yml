@@ -21,3 +21,7 @@ wxg:
   file:
     storage-dir: uploads
     base-url: /wxg/file/access/
+  wechat:
+    appid: wxa46f1050fff7f28b
+    secret: 275745dae4dda4a21b04497d7a3cdc9b
+    subscribe-template-id: ZWGZk7oVGSlroh86kbxO4OZQ97pCeY-E2o2Sa15JqcU

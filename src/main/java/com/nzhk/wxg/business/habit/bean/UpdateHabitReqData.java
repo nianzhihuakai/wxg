@@ -16,4 +16,8 @@ public class UpdateHabitReqData {
     private LocalDate startDate;
 
     private LocalDate endDate;
+
+    private Boolean remindFlag;
+
+    private String remindTime;
 }

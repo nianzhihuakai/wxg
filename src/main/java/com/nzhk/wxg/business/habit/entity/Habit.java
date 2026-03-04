@@ -108,4 +108,16 @@ public class Habit implements Serializable {
 
     private LocalDateTime archiveDateTime;
 
+    /**
+     * 是否开启提醒：0-关闭，1-开启
+     */
+    @ApiModelProperty("是否开启提醒")
+    private Boolean remindFlag;
+
+    /**
+     * 提醒时间，格式 HH:mm，如 09:30
+     */
+    @ApiModelProperty("提醒时间 HH:mm")
+    private String remindTime;
+
 }

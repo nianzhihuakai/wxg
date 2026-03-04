@@ -109,6 +109,8 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setUserId(ContextCache.getUserId());
         habit.setStartDate(data.getStartDate());
         habit.setEndDate(data.getEndDate());
+        habit.setRemindFlag(Boolean.TRUE.equals(data.getRemindFlag()));
+        habit.setRemindTime(data.getRemindTime());
         baseMapper.insert(habit);
     }
 
@@ -119,7 +121,9 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .set(Habit::getHabitTypeId, data.getHabitTypeId())
                 .set(Habit::getName, data.getName())
                 .set(Habit::getStartDate, data.getStartDate())
-                .set(Habit::getEndDate, data.getEndDate());
+                .set(Habit::getEndDate, data.getEndDate())
+                .set(Habit::getRemindFlag, Boolean.TRUE.equals(data.getRemindFlag()))
+                .set(Habit::getRemindTime, data.getRemindTime());
         baseMapper.update(habitLambdaUpdateWrapper);
     }
 
@@ -150,5 +154,20 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .set(Habit::getStatus, 2)
                 .set(Habit::getArchiveDateTime, now);
         baseMapper.update(null, updateWrapper);
+    }
+
+    @Override
+    public List<Habit> listHabitsNeedRemind(String remindTime) {
+        if (remindTime == null || remindTime.isEmpty()) {
+            return List.of();
+        }
+        LocalDate today = LocalDate.now();
+        LambdaQueryWrapper<Habit> q = new LambdaQueryWrapper<>();
+        q.eq(Habit::getRemindFlag, true)
+                .eq(Habit::getRemindTime, remindTime)
+                .eq(Habit::getStatus, 1)
+                .le(Habit::getStartDate, today)
+                .ge(Habit::getEndDate, today);
+        return baseMapper.selectList(q);
     }
 }

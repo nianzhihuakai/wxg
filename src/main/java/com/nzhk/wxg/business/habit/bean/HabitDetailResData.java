@@ -96,6 +96,10 @@ public class HabitDetailResData {
 
     private String habitTypeId;
 
+    private Boolean remindFlag;
+
+    private String remindTime;
+
     private Integer totalCheckInNum = 0;
 
     private Integer checkInNum = 0;
