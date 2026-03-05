@@ -9,6 +9,10 @@ public class UserInfoResData {
 
     private String id;
 
+    private String avatarUrl;
+
+    private String nickName;
+
     private LocalDateTime createTime;
 
     private String versionNo = "1.1.0";

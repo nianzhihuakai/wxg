@@ -5,6 +5,7 @@ import com.nzhk.wxg.business.wxuser.bean.UserInfoResData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.service.IWxUserService;
+import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.info.RequestInfo;
 import com.nzhk.wxg.common.info.ResponseInfo;
 import jakarta.annotation.Resource;
@@ -37,6 +38,13 @@ public class WxUserController {
     @PostMapping("getUserInfo")
     public ResponseInfo<UserInfoResData> getUserInfo () {
         log.info("getUserInfo request");
-        return ResponseInfo.success(wxUserService.getUserInfo());
+        try {
+            return ResponseInfo.success(wxUserService.getUserInfo());
+        } catch (BizException e) {
+            return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("getUserInfo error", e);
+            return ResponseInfo.fail(50000, "服务器异常", null);
+        }
     }
 }

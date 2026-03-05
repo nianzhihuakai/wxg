@@ -12,6 +12,7 @@ import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginResData;
 import com.nzhk.wxg.business.wxuser.entity.WxUser;
 import com.nzhk.wxg.business.wxuser.vo.WxLoginResVO;
+import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.cache.UserInfo;
 import com.nzhk.wxg.common.utils.BeanConvertUtil;
@@ -128,6 +129,9 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     public UserInfoResData getUserInfo() {
         log.info("getUserInfo userId:{}", ContextCache.getUserId());
         WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
+        if (wxUser == null) {
+            throw new BizException(40400, "用户不存在");
+        }
         return BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
     }
 

@@ -37,6 +37,7 @@ public class FileServiceImpl implements IFileService {
 
     private static final long MAX_SIZE = 10L * 1024 * 1024;
     private static final Set<String> ALLOW_EXT = Set.of("jpg", "jpeg", "png", "webp");
+    private static final Set<String> ALLOW_BIZ_TYPE = Set.of("journal", "avatar");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     @Value("${wxg.file.storage-dir:uploads}")
@@ -53,7 +54,7 @@ public class FileServiceImpl implements IFileService {
         if (file == null || file.isEmpty()) {
             throw new BizException(40000, "文件不能为空");
         }
-        if (!"journal".equals(bizType)) {
+        if (StringUtils.isBlank(bizType) || !ALLOW_BIZ_TYPE.contains(bizType)) {
             throw new BizException(40000, "bizType 参数错误");
         }
         if (file.getSize() > MAX_SIZE) {
@@ -67,7 +68,7 @@ public class FileServiceImpl implements IFileService {
         }
 
         String fileId = "f_" + System.currentTimeMillis() + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        String relativeDir = "journal/" + LocalDate.now().format(DATE_FORMATTER);
+        String relativeDir = bizType + "/" + LocalDate.now().format(DATE_FORMATTER);
         String storedName = fileId + "." + ext.toLowerCase(Locale.ROOT);
         Path targetDir = Paths.get(storageDir, relativeDir);
         Path targetPath = targetDir.resolve(storedName);
