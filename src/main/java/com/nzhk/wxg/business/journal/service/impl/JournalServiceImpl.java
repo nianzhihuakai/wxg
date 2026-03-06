@@ -36,6 +36,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -312,31 +313,47 @@ public class JournalServiceImpl implements IJournalService {
         LambdaQueryWrapper<JournalImage> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(JournalImage::getJournalId, journalId).eq(JournalImage::getUserId, userId);
         List<JournalImage> toDeleteImages = journalImageMapper.selectList(queryWrapper);
-        List<String> fileIds = toDeleteImages.stream()
+        List<String> oldFileIds = toDeleteImages.stream()
                 .map(JournalImage::getFileId)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
+        Set<String> keepFileIds = CollectionUtils.isEmpty(images) ? Collections.emptySet()
+                : images.stream()
+                        .filter(img -> img != null && StringUtils.isNotBlank(img.getFileId()))
+                        .map(JournalImageReqData::getFileId)
+                        .collect(Collectors.toSet());
+        List<String> fileIdsToDelete = oldFileIds.stream()
+                .filter(id -> !keepFileIds.contains(id))
+                .collect(Collectors.toList());
+
+        if (!CollectionUtils.isEmpty(images)) {
+            images.sort(Comparator.comparing(JournalImageReqData::getSort, Comparator.nullsLast(Integer::compareTo)));
+            // 先校验所有图片，确保文件存在且归属正确，再执行删除，避免误删后校验失败
+            for (JournalImageReqData image : images) {
+                if (image == null || StringUtils.isBlank(image.getFileId()) || StringUtils.isBlank(image.getUrl()) || image.getSort() == null) {
+                    throw new BizException(40000, "images 参数不完整");
+                }
+                if (image.getSort() <= 0) {
+                    throw new BizException(40000, "images.sort 必须从 1 开始");
+                }
+                UploadedFile uploadedFile = fileService.getByFileId(image.getFileId());
+                if (uploadedFile == null || !StringUtils.equals(uploadedFile.getUserId(), userId)) {
+                    throw new BizException(40000, "图片文件不存在或不属于当前用户");
+                }
+            }
+        }
+
         journalImageMapper.delete(queryWrapper);
-        fileService.deleteByFileIds(fileIds);
+        fileService.deleteByFileIds(fileIdsToDelete);
 
         if (CollectionUtils.isEmpty(images)) {
             return;
         }
 
-        images.sort(Comparator.comparing(JournalImageReqData::getSort, Comparator.nullsLast(Integer::compareTo)));
         for (int i = 0; i < images.size(); i++) {
             JournalImageReqData image = images.get(i);
-            if (image == null || StringUtils.isBlank(image.getFileId()) || StringUtils.isBlank(image.getUrl()) || image.getSort() == null) {
-                throw new BizException(40000, "images 参数不完整");
-            }
-            if (image.getSort() <= 0) {
-                throw new BizException(40000, "images.sort 必须从 1 开始");
-            }
             UploadedFile uploadedFile = fileService.getByFileId(image.getFileId());
-            if (uploadedFile == null || !StringUtils.equals(uploadedFile.getUserId(), userId)) {
-                throw new BizException(40000, "图片文件不存在或不属于当前用户");
-            }
 
             JournalImage journalImage = new JournalImage();
             journalImage.setId(IdUtil.getId());
