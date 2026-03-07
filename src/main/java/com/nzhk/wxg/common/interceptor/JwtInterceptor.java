@@ -25,24 +25,26 @@ public class JwtInterceptor implements HandlerInterceptor {
         String token = request.getHeader("token");
         if (StringUtils.isEmpty(token)) {
             log.warn("requestURI:{} token empty", requestURI);
-            ResponseUtil.setResponse(response, 500, "登录失效，请重新登录");
+            ResponseUtil.writeJsonResponse(response, 401, 40100, "登录失效，请重新登录", null);
             return false;
         }
-        Map<String, Object> jwtMap = null;
+        Map<String, Object> jwtMap;
         try {
             jwtMap = JwtUtil.parseToken(token);
         } catch (IllegalArgumentException e) {
             log.warn("requestURI:{} token parse error, msg: Token 为空", requestURI);
-            throw new RuntimeException("Token 为空");
+            ResponseUtil.writeJsonResponse(response, 401, 40101, "Token 为空", null);
+            return false;
         } catch (Exception e) {
             log.warn("requestURI:{} token verify failed, msg:{}", requestURI, e.getMessage());
-            throw new RuntimeException("Token 验证失败：" + e.getMessage());
+            ResponseUtil.writeJsonResponse(response, 401, 40102, "Token 验证失败，请重新登录", null);
+            return false;
         }
 
         Object userIdObj = jwtMap.get("userId");
         if (null == userIdObj) {
             log.warn("requestURI:{} jwt claims userId is null", requestURI);
-            ResponseUtil.setResponse(response, 500, "登录失效，请重新登录");
+            ResponseUtil.writeJsonResponse(response, 401, 40100, "登录失效，请重新登录", null);
             return false;
         }
 
