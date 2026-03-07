@@ -16,6 +16,7 @@ import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.cache.UserInfo;
 import com.nzhk.wxg.common.utils.BeanConvertUtil;
+import com.nzhk.wxg.common.utils.FileSignUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.JwtUtil;
 import com.nzhk.wxg.mapper.HabitTypeMapper;
@@ -48,6 +49,9 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     private HabitTypeMapper habitTypeMapper;
     @Resource
     private IHabitTypeService habitTypeService;
+
+    @Resource
+    private FileSignUtil fileSignUtil;
 
     @Override
     public WxUserLoginResData login(WxUserLoginReqData wxUserLoginReqData) {
@@ -90,7 +94,8 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", wxUser.getId());
         String token = JwtUtil.generateToken(claims);
-        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(wxUser.getAvatarUrl()).nickName(wxUser.getNickName()).build();
+        String avatarUrl = fileSignUtil.signFileUrlIfNeeded(wxUser.getAvatarUrl());
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(avatarUrl).nickName(wxUser.getNickName()).build();
 
         LambdaQueryWrapper<HabitType> habitTypeLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitTypeLambdaQueryWrapper.eq(HabitType::getUserId, userInfo.getId());
@@ -113,15 +118,17 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     @Override
     public WxUserLoginResData saveUserInfo(SaveUserInfoReqData data) {
         log.info("saveUserInfo userId:{}, nickName:{}", ContextCache.getUserId(), data != null ? data.getNickName() : null);
+        String storedAvatarUrl = fileSignUtil.toStoredUrl(data != null ? data.getAvatarUrl() : null);
         LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         wxUserLambdaUpdateWrapper.eq(WxUser::getId, ContextCache.getUserId())
                 .set(WxUser::getNickName, data.getNickName())
-                .set(WxUser::getAvatarUrl, data.getAvatarUrl());
+                .set(WxUser::getAvatarUrl, storedAvatarUrl);
         baseMapper.update(null, wxUserLambdaUpdateWrapper);
 
         WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
 
-        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(data.getAvatarUrl()).nickName(data.getNickName()).build();
+        String avatarUrl = fileSignUtil.signFileUrlIfNeeded(storedAvatarUrl);
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(avatarUrl).nickName(data.getNickName()).build();
         return WxUserLoginResData.builder().userInfo(userInfo).build();
     }
 
@@ -132,7 +139,11 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         if (wxUser == null) {
             throw new BizException(40400, "用户不存在");
         }
-        return BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
+        UserInfoResData res = BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
+        if (res != null && res.getAvatarUrl() != null) {
+            res.setAvatarUrl(fileSignUtil.signFileUrlIfNeeded(res.getAvatarUrl()));
+        }
+        return res;
     }
 
 

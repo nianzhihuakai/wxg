@@ -12,6 +12,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.nzhk.wxg.common.utils.FileSignUtil;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +33,9 @@ public class FileController {
     @Resource
     private IFileService fileService;
 
+    @Resource
+    private FileSignUtil fileSignUtil;
+
     @PostMapping("/upload")
     public ResponseInfo<FileUploadResData> upload(@RequestParam("file") MultipartFile file,
                                                   @RequestParam("bizType") String bizType,
@@ -50,7 +54,13 @@ public class FileController {
     }
 
     @GetMapping("/access/{fileId}")
-    public ResponseEntity<FileSystemResource> access(@PathVariable("fileId") String fileId) {
+    public ResponseEntity<FileSystemResource> access(@PathVariable("fileId") String fileId,
+                                                    @RequestParam(value = "sign", required = false) String sign,
+                                                    @RequestParam(value = "expires", required = false) Long expires) {
+        if (!fileSignUtil.validate(fileId, sign, expires)) {
+            log.warn("file access unauthorized or expired, fileId={}", fileId);
+            return ResponseEntity.status(403).build();
+        }
         UploadedFile uploadedFile = fileService.getByFileId(fileId);
         if (uploadedFile == null) {
             return ResponseEntity.notFound().build();

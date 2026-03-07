@@ -5,6 +5,7 @@ import com.nzhk.wxg.business.file.bean.FileUploadResData;
 import com.nzhk.wxg.business.file.entity.UploadedFile;
 import com.nzhk.wxg.business.file.service.IFileService;
 import com.nzhk.wxg.common.exception.BizException;
+import com.nzhk.wxg.common.utils.FileSignUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.mapper.UploadedFileMapper;
 import jakarta.annotation.Resource;
@@ -48,6 +49,9 @@ public class FileServiceImpl implements IFileService {
 
     @Resource
     private UploadedFileMapper uploadedFileMapper;
+
+    @Resource
+    private FileSignUtil fileSignUtil;
 
     @Override
     public FileUploadResData upload(String userId, MultipartFile file, String bizType, String clientTraceId) {
@@ -94,8 +98,7 @@ public class FileServiceImpl implements IFileService {
             log.warn("read image metadata failed, fileId:{}", fileId, e);
         }
 
-        String finalBaseUrl = StringUtils.appendIfMissing(baseUrl, "/");
-        String accessUrl = finalBaseUrl + fileId;
+        String accessUrl = fileSignUtil.generateSignedUrl(fileId);
 
         UploadedFile uploadedFile = new UploadedFile();
         uploadedFile.setId(IdUtil.getId());
@@ -104,7 +107,8 @@ public class FileServiceImpl implements IFileService {
         uploadedFile.setBizType(bizType);
         uploadedFile.setOriginalName(originalName);
         uploadedFile.setStoragePath(targetPath.toAbsolutePath().toString());
-        uploadedFile.setUrl(accessUrl);
+        String storedUrl = StringUtils.appendIfMissing(baseUrl, "/") + fileId;
+        uploadedFile.setUrl(storedUrl);
         uploadedFile.setMimeType(file.getContentType());
         uploadedFile.setFileSize(file.getSize());
         uploadedFile.setWidth(width);

@@ -21,6 +21,8 @@ wxg:
   file:
     storage-dir: E:/data/wxg/uploads
     base-url: /wxg/file/access/
+    sign-secret: ${WXG_FILE_SIGN_SECRET:wxg-file-secret}
+    sign-expire-seconds: ${WXG_FILE_SIGN_EXPIRE:3600}
   wechat:
     appid: wxa46f1050fff7f28b
     secret: 275745dae4dda4a21b04497d7a3cdc9b

@@ -16,6 +16,7 @@ import com.nzhk.wxg.business.journal.entity.Journal;
 import com.nzhk.wxg.business.journal.entity.JournalImage;
 import com.nzhk.wxg.business.journal.service.IJournalService;
 import com.nzhk.wxg.common.exception.BizException;
+import com.nzhk.wxg.common.utils.FileSignUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.mapper.JournalImageMapper;
 import com.nzhk.wxg.mapper.JournalMapper;
@@ -53,6 +54,9 @@ public class JournalServiceImpl implements IJournalService {
 
     @Resource
     private IFileService fileService;
+
+    @Resource
+    private FileSignUtil fileSignUtil;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -124,7 +128,7 @@ public class JournalServiceImpl implements IJournalService {
             for (JournalImage item : journalImages) {
                 JournalImageResData imageResData = new JournalImageResData();
                 imageResData.setFileId(item.getFileId());
-                imageResData.setUrl(item.getImageUrl());
+                imageResData.setUrl(fileSignUtil.generateSignedUrl(item.getFileId()));
                 imageResData.setSort(item.getSortOrder());
                 imageResData.setWidth(item.getWidth());
                 imageResData.setHeight(item.getHeight());
@@ -360,7 +364,7 @@ public class JournalServiceImpl implements IJournalService {
             journalImage.setJournalId(journalId);
             journalImage.setUserId(userId);
             journalImage.setFileId(image.getFileId());
-            journalImage.setImageUrl(image.getUrl());
+            journalImage.setImageUrl(fileSignUtil.toStoredUrl(image.getUrl()));
             journalImage.setSortOrder(image.getSort());
             journalImage.setWidth(image.getWidth());
             journalImage.setHeight(image.getHeight());
@@ -399,7 +403,7 @@ public class JournalServiceImpl implements IJournalService {
         for (JournalImage image : journalImages) {
             JournalImageResData imageResData = new JournalImageResData();
             imageResData.setFileId(image.getFileId());
-            imageResData.setUrl(image.getImageUrl());
+            imageResData.setUrl(fileSignUtil.generateSignedUrl(image.getFileId()));
             imageResData.setSort(image.getSortOrder());
             imageResData.setWidth(image.getWidth());
             imageResData.setHeight(image.getHeight());
