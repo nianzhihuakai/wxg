@@ -75,6 +75,28 @@ public class JournalController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseInfo<JournalListResData> search(@RequestParam(value = "subject", required = false) String subject,
+                                                   @RequestParam(value = "keyword", required = false) String keyword,
+                                                   @RequestParam(value = "moodValue", required = false) String moodValue,
+                                                   @RequestParam(value = "dateStart", required = false) String dateStart,
+                                                   @RequestParam(value = "dateEnd", required = false) String dateEnd,
+                                                   @RequestParam("pageNo") Integer pageNo,
+                                                   @RequestParam("pageSize") Integer pageSize) {
+        try {
+            String userId = ContextCache.getUserId();
+            log.info("journal search request, userId:{}, subject:{}, keyword:{}, moodValue:{}, dateStart:{}, dateEnd:{}, pageNo:{}, pageSize:{}",
+                    userId, subject, keyword, moodValue, dateStart, dateEnd, pageNo, pageSize);
+            JournalListResData resData = journalService.search(userId, subject, keyword, moodValue, dateStart, dateEnd, pageNo, pageSize);
+            return ResponseInfo.success(resData);
+        } catch (BizException e) {
+            return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("journal search system error", e);
+            return ResponseInfo.fail(50000, "服务器异常", null);
+        }
+    }
+
     @PostMapping("/delete")
     public ResponseInfo<Void> delete(@RequestBody RequestInfo<JournalDeleteReqData> requestInfo) {
         try {

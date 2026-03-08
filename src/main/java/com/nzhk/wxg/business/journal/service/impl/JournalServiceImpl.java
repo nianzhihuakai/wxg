@@ -194,6 +194,81 @@ public class JournalServiceImpl implements IJournalService {
     }
 
     @Override
+    public JournalListResData search(String userId, String subject, String keyword, String moodValue, String dateStart, String dateEnd, Integer pageNo, Integer pageSize) {
+        boolean hasSubject = StringUtils.isNotBlank(subject);
+        boolean hasKeyword = StringUtils.isNotBlank(keyword);
+        boolean hasMood = StringUtils.isNotBlank(moodValue);
+        boolean hasDateStart = StringUtils.isNotBlank(dateStart);
+        boolean hasDateEnd = StringUtils.isNotBlank(dateEnd);
+        if (!hasSubject && !hasKeyword && !hasMood && !hasDateStart && !hasDateEnd) {
+            throw new BizException(40000, "请至少选择一个搜索条件：年月、心情、主题或内容");
+        }
+        validatePage(pageNo, pageSize);
+        int offset = (pageNo - 1) * pageSize;
+
+        LambdaQueryWrapper<Journal> countWrapper = buildSearchWrapper(userId, subject, keyword, moodValue, dateStart, dateEnd);
+        Long total = journalMapper.selectCount(countWrapper);
+        if (total == null) {
+            total = 0L;
+        }
+
+        List<JournalHistoryItemResData> records = new ArrayList<>();
+        if (total > 0) {
+            LambdaQueryWrapper<Journal> wrapper = buildSearchWrapper(userId, subject, keyword, moodValue, dateStart, dateEnd);
+            wrapper.orderByDesc(Journal::getJournalDate)
+                    .orderByDesc(Journal::getUpdatedAt)
+                    .last("limit " + pageSize + " offset " + offset);
+            List<Journal> journals = journalMapper.selectList(wrapper);
+            if (!CollectionUtils.isEmpty(journals)) {
+                Map<String, List<JournalImageResData>> imageMap = queryImageMap(userId, journals);
+                for (Journal journal : journals) {
+                    JournalHistoryItemResData item = new JournalHistoryItemResData();
+                    item.setJournalId(journal.getId());
+                    item.setDate(journal.getJournalDate().format(DATE_FORMATTER));
+                    item.setMoodValue(journal.getMoodValue());
+                    item.setMoodLabel(journal.getMoodLabel());
+                    item.setSubject(journal.getSubject());
+                    item.setContent(journal.getContent());
+                    item.setUpdatedAt(journal.getUpdatedAt() == null ? null : journal.getUpdatedAt().toString());
+                    item.setImages(imageMap.getOrDefault(journal.getId(), Collections.emptyList()));
+                    records.add(item);
+                }
+            }
+        }
+
+        JournalListResData resData = new JournalListResData();
+        resData.setPageNo(pageNo);
+        resData.setPageSize(pageSize);
+        resData.setTotal(total);
+        resData.setHasMore((long) pageNo * pageSize < total);
+        resData.setRecords(records);
+        return resData;
+    }
+
+    private LambdaQueryWrapper<Journal> buildSearchWrapper(String userId, String subject, String keyword, String moodValue, String dateStart, String dateEnd) {
+        LambdaQueryWrapper<Journal> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Journal::getUserId, userId).eq(Journal::getStatus, 1);
+        if (StringUtils.isNotBlank(subject)) {
+            wrapper.like(Journal::getSubject, subject.trim());
+        }
+        if (StringUtils.isNotBlank(keyword)) {
+            wrapper.like(Journal::getContent, keyword.trim());
+        }
+        if (StringUtils.isNotBlank(moodValue)) {
+            wrapper.eq(Journal::getMoodValue, moodValue.trim());
+        }
+        if (StringUtils.isNotBlank(dateStart)) {
+            LocalDate start = parseDate(dateStart);
+            wrapper.ge(Journal::getJournalDate, start);
+        }
+        if (StringUtils.isNotBlank(dateEnd)) {
+            LocalDate end = parseDate(dateEnd);
+            wrapper.le(Journal::getJournalDate, end);
+        }
+        return wrapper;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String userId, JournalDeleteReqData data) {
         if (data == null || StringUtils.isBlank(data.getJournalId())) {
