@@ -120,4 +120,16 @@ public class Habit implements Serializable {
     @ApiModelProperty("提醒时间 HH:mm")
     private String remindTime;
 
+    /**
+     * 打卡频次类型：fixed-固定周几，weekly-每周N次，monthly-每月N次
+     */
+    @ApiModelProperty("打卡频次类型")
+    private String checkInFrequencyType;
+
+    /**
+     * 打卡频次：fixed时为"1,2,3,4,5,6,7"；weekly时为"3"；monthly时为"15"
+     */
+    @ApiModelProperty("打卡频次")
+    private String checkInFrequency;
+
 }

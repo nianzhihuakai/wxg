@@ -100,10 +100,23 @@ public class HabitDetailResData {
 
     private String remindTime;
 
+    /** 打卡频次类型：fixed/weekly/monthly */
+    private String checkInFrequencyType;
+
+    /** 打卡频次 */
+    private String checkInFrequency;
+
     private Integer totalCheckInNum = 0;
 
     private Integer checkInNum = 0;
 
     private BigDecimal checkInRate = BigDecimal.ZERO;
 
+    /** 本周打卡次数（用于 weekly 类型展示 1/3） */
+    @ApiModelProperty("本周打卡次数")
+    private Integer weekCheckInCount;
+
+    /** 本月打卡次数（用于 monthly 类型展示 5/15） */
+    @ApiModelProperty("本月打卡次数")
+    private Integer monthCheckInCount;
 }

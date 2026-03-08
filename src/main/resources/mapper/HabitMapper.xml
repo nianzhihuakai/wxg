@@ -12,6 +12,7 @@
                 and h.habit_type_id = #{habitTypeId}
             </if>
         </where>
+        order by h.create_time desc
     </select>
     <select id="selectArchiveHabitList" resultType="com.nzhk.wxg.business.habit.bean.HabitListResData">
         select h.* from habit h
@@ -21,5 +22,6 @@
                 and h.habit_type_id = #{habitTypeId}
             </if>
         </where>
+        order by h.create_time desc
     </select>
 </mapper>

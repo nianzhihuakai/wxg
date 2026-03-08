@@ -101,4 +101,29 @@ public class HabitListResData {
     private Integer checkInNum = 0;
 
     private BigDecimal checkInRate = BigDecimal.ZERO;
+
+    private String checkInFrequencyType;
+
+    private String checkInFrequency;
+
+    /**
+     * 今日是否展示为可打卡（可操作打卡按钮）
+     * true-今日可打卡或已打卡，false-今日休息或本周/月已达标
+     */
+    @ApiModelProperty("今日是否展示为可打卡")
+    private Boolean showToday;
+
+    /**
+     * 不展示打卡时的原因：rest-今日休息日，weekly_done-本周已达标，monthly_done-本月已达标，null-正常可打卡
+     */
+    @ApiModelProperty("不展示打卡原因: rest/weekly_done/monthly_done")
+    private String showReason;
+
+    /** 本周打卡次数（用于 weekly 类型展示 1/3） */
+    @ApiModelProperty("本周打卡次数")
+    private Integer weekCheckInCount;
+
+    /** 本月打卡次数（用于 monthly 类型展示 5/15） */
+    @ApiModelProperty("本月打卡次数")
+    private Integer monthCheckInCount;
 }

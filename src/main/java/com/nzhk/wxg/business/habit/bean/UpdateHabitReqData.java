@@ -20,4 +20,10 @@ public class UpdateHabitReqData {
     private Boolean remindFlag;
 
     private String remindTime;
+
+    /** 打卡频次类型：fixed/weekly/monthly */
+    private String checkInFrequencyType;
+
+    /** 打卡频次 */
+    private String checkInFrequency;
 }

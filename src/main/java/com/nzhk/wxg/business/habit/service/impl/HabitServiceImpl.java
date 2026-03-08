@@ -20,11 +20,13 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -44,29 +46,112 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public List<HabitListResData> getHabits(HabitListReqData data) {
-
         log.info("getHabits userId:{}", ContextCache.getUserId());
-        List<HabitListResData> habits = baseMapper.selectHabitList(ContextCache.getUserId(), LocalDate.now(), data.getHabitTypeId());
-        LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
-        habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getUserId, ContextCache.getUserId());
-        List<HabitCheckIn> habitCheckIns = habitCheckInMapper.selectList(habitCheckInLambdaQueryWrapper);
-        Map<String, List<HabitCheckIn>> habitIdMap = habitCheckIns.stream().collect(Collectors.groupingBy(HabitCheckIn::getHabitId));
+        String userId = ContextCache.getUserId();
+        LocalDate now = LocalDate.now();
+        List<HabitListResData> habits = baseMapper.selectHabitList(userId, now, data.getHabitTypeId());
 
-        habits.forEach(f->{
+        int dayOfWeek = now.getDayOfWeek().getValue();
+        LocalDate weekStart = now.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate monthStart = now.withDayOfMonth(1);
+        LocalDate monthEnd = now.withDayOfMonth(now.lengthOfMonth());
+
+        LambdaQueryWrapper<HabitCheckIn> allWrapper = new LambdaQueryWrapper<>();
+        allWrapper.eq(HabitCheckIn::getUserId, userId);
+        List<HabitCheckIn> allCheckIns = habitCheckInMapper.selectList(allWrapper);
+        Map<String, List<HabitCheckIn>> habitIdMap = allCheckIns.stream().collect(Collectors.groupingBy(HabitCheckIn::getHabitId));
+
+        Map<String, Long> weekCountMap = allCheckIns.stream()
+                .filter(c -> !c.getCheckInDate().isBefore(weekStart) && !c.getCheckInDate().isAfter(weekEnd))
+                .collect(Collectors.groupingBy(HabitCheckIn::getHabitId, Collectors.counting()));
+        Map<String, Long> monthCountMap = allCheckIns.stream()
+                .filter(c -> !c.getCheckInDate().isBefore(monthStart) && !c.getCheckInDate().isAfter(monthEnd))
+                .collect(Collectors.groupingBy(HabitCheckIn::getHabitId, Collectors.counting()));
+
+        habits.forEach(f -> {
+            ShowState state = computeShowState(f, dayOfWeek, weekCountMap, monthCountMap);
+            f.setShowToday(state.showToday);
+            f.setShowReason(state.showReason);
+        });
+
+        habits.forEach(f -> {
             if (StringUtils.isNotEmpty(f.getCheckInId())) {
                 f.setAlreadyCheckedInToday(true);
             }
             List<HabitCheckIn> habitCheckInsById = habitIdMap.get(f.getId());
             if (!CollectionUtils.isEmpty(habitCheckInsById)) {
                 f.setCheckInNum(habitCheckInsById.size());
-                int totalDays = (int) ChronoUnit.DAYS.between(f.getCreateTime().toLocalDate(), LocalDate.now()) + 1;
+                int totalDays = (int) ChronoUnit.DAYS.between(f.getCreateTime().toLocalDate(), now) + 1;
                 f.setTotalCheckInNum(totalDays);
-//                if (0 != totalDays) {
-//                    f.setCheckInRate(new BigDecimal(habitCheckInsById.size()).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP));
-//                }
             }
+            f.setWeekCheckInCount(weekCountMap.getOrDefault(f.getId(), 0L).intValue());
+            f.setMonthCheckInCount(monthCountMap.getOrDefault(f.getId(), 0L).intValue());
         });
         return habits;
+    }
+
+    /**
+     * 计算习惯今日展示状态：是否可打卡、不可打卡时的原因
+     */
+    private ShowState computeShowState(HabitListResData h, int dayOfWeek, Map<String, Long> weekCountMap, Map<String, Long> monthCountMap) {
+        String type = StringUtils.isNotBlank(h.getCheckInFrequencyType()) ? h.getCheckInFrequencyType() : "fixed";
+        String freq = h.getCheckInFrequency();
+        if ("fixed".equals(type)) {
+            if (StringUtils.isBlank(freq)) return new ShowState(true, null);
+            Set<String> days = Set.of(freq.split(","));
+            boolean showToday = days.contains(String.valueOf(dayOfWeek));
+            return new ShowState(showToday, showToday ? null : "rest");
+        }
+        if ("weekly".equals(type)) {
+            int target = parseIntSafe(freq, 7);
+            if (target <= 0) return new ShowState(true, null);
+            long count = weekCountMap.getOrDefault(h.getId(), 0L);
+            boolean showToday = count < target;
+            return new ShowState(showToday, showToday ? null : "weekly_done");
+        }
+        if ("monthly".equals(type)) {
+            int target = parseIntSafe(freq, 31);
+            if (target <= 0) return new ShowState(true, null);
+            long count = monthCountMap.getOrDefault(h.getId(), 0L);
+            boolean showToday = count < target;
+            return new ShowState(showToday, showToday ? null : "monthly_done");
+        }
+        return new ShowState(true, null);
+    }
+
+    private static class ShowState {
+        final boolean showToday;
+        final String showReason;
+
+        ShowState(boolean showToday, String showReason) {
+            this.showToday = showToday;
+            this.showReason = showReason;
+        }
+    }
+
+    private String parseFrequencyForSave(String type, String freq) {
+        if ("fixed".equals(type)) {
+            return StringUtils.isNotBlank(freq) ? freq.trim() : "1,2,3,4,5,6,7";
+        }
+        if ("weekly".equals(type)) {
+            int n = parseIntSafe(freq, 1);
+            return String.valueOf(Math.min(7, Math.max(1, n)));
+        }
+        if ("monthly".equals(type)) {
+            int n = parseIntSafe(freq, 1);
+            return String.valueOf(Math.min(31, Math.max(1, n)));
+        }
+        return StringUtils.isNotBlank(freq) ? freq.trim() : "1,2,3,4,5,6,7";
+    }
+
+    private int parseIntSafe(String s, int defaultVal) {
+        if (StringUtils.isBlank(s)) return defaultVal;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return defaultVal;
+        }
     }
 
     @Override
@@ -96,6 +181,20 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
             }
         }
 
+        LocalDate now = LocalDate.now();
+        LocalDate weekStart = now.with(DayOfWeek.MONDAY);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate monthStart = now.withDayOfMonth(1);
+        LocalDate monthEnd = now.withDayOfMonth(now.lengthOfMonth());
+        long weekCount = habitCheckIns.stream()
+                .filter(c -> !c.getCheckInDate().isBefore(weekStart) && !c.getCheckInDate().isAfter(weekEnd))
+                .count();
+        long monthCount = habitCheckIns.stream()
+                .filter(c -> !c.getCheckInDate().isBefore(monthStart) && !c.getCheckInDate().isAfter(monthEnd))
+                .count();
+        habitDetailResData.setWeekCheckInCount((int) weekCount);
+        habitDetailResData.setMonthCheckInCount((int) monthCount);
+
         return habitDetailResData;
     }
 
@@ -111,6 +210,10 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setEndDate(data.getEndDate());
         habit.setRemindFlag(Boolean.TRUE.equals(data.getRemindFlag()));
         habit.setRemindTime(data.getRemindTime());
+        String type = StringUtils.isNotBlank(data.getCheckInFrequencyType()) ? data.getCheckInFrequencyType() : "fixed";
+        habit.setCheckInFrequencyType(type);
+        String freq = data.getCheckInFrequency();
+        habit.setCheckInFrequency(parseFrequencyForSave(type, freq));
         baseMapper.insert(habit);
     }
 
@@ -124,6 +227,12 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .set(Habit::getEndDate, data.getEndDate())
                 .set(Habit::getRemindFlag, Boolean.TRUE.equals(data.getRemindFlag()))
                 .set(Habit::getRemindTime, data.getRemindTime());
+        if (data.getCheckInFrequencyType() != null || data.getCheckInFrequency() != null) {
+            String type = data.getCheckInFrequencyType() != null ? data.getCheckInFrequencyType() : "fixed";
+            String freq = parseFrequencyForSave(type, data.getCheckInFrequency());
+            habitLambdaUpdateWrapper.set(Habit::getCheckInFrequencyType, type);
+            habitLambdaUpdateWrapper.set(Habit::getCheckInFrequency, freq);
+        }
         baseMapper.update(habitLambdaUpdateWrapper);
     }
 
