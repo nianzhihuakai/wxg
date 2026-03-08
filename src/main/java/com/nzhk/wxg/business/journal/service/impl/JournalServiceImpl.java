@@ -27,6 +27,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -292,6 +295,97 @@ public class JournalServiceImpl implements IJournalService {
         fileService.deleteByFileIds(fileIds);
     }
 
+    @Override
+    public byte[] exportPdf(String userId, String month) {
+        LocalDate monthStart = parseMonthStart(month);
+        LocalDate nextMonthStart = monthStart.plusMonths(1);
+        LambdaQueryWrapper<Journal> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Journal::getUserId, userId)
+                .eq(Journal::getStatus, 1)
+                .ge(Journal::getJournalDate, monthStart)
+                .lt(Journal::getJournalDate, nextMonthStart)
+                .orderByAsc(Journal::getJournalDate);
+        List<Journal> journals = journalMapper.selectList(wrapper);
+        return buildPdf(userId, month, journals);
+    }
+
+    private byte[] buildPdf(String userId, String month, List<Journal> journals) {
+        try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+            com.lowagie.text.Document document = new com.lowagie.text.Document(com.lowagie.text.PageSize.A4, 54, 54, 54, 54);
+            com.lowagie.text.pdf.PdfWriter.getInstance(document, baos);
+            document.open();
+            com.lowagie.text.pdf.BaseFont bf;
+            try {
+                bf = com.lowagie.text.pdf.BaseFont.createFont("STSong-Light", "UniGB-UCS2-H", com.lowagie.text.pdf.BaseFont.NOT_EMBEDDED);
+            } catch (Exception e) {
+                log.warn("Chinese font not available, using Helvetica", e);
+                bf = com.lowagie.text.pdf.BaseFont.createFont(com.lowagie.text.pdf.BaseFont.HELVETICA, com.lowagie.text.pdf.BaseFont.WINANSI, com.lowagie.text.pdf.BaseFont.NOT_EMBEDDED);
+            }
+            java.awt.Color titleColor = new java.awt.Color(45, 55, 72);
+            java.awt.Color metaColor = new java.awt.Color(107, 114, 128);
+            java.awt.Color contentColor = new java.awt.Color(75, 85, 99);
+            com.lowagie.text.Font titleFont = new com.lowagie.text.Font(bf, 22, com.lowagie.text.Font.BOLD, titleColor);
+            com.lowagie.text.Font metaFont = new com.lowagie.text.Font(bf, 11, com.lowagie.text.Font.NORMAL, metaColor);
+            com.lowagie.text.Font subjectFont = new com.lowagie.text.Font(bf, 14, com.lowagie.text.Font.BOLD, titleColor);
+            com.lowagie.text.Font contentFont = new com.lowagie.text.Font(bf, 12, com.lowagie.text.Font.NORMAL, contentColor);
+            com.lowagie.text.Paragraph title = new com.lowagie.text.Paragraph(month + " 日记", titleFont);
+            title.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+            title.setSpacingAfter(8);
+            document.add(title);
+            String exportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日"));
+            com.lowagie.text.Paragraph subTitle = new com.lowagie.text.Paragraph("导出日期：" + exportDate, metaFont);
+            subTitle.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+            subTitle.setSpacingAfter(20);
+            document.add(subTitle);
+            com.lowagie.text.pdf.draw.LineSeparator sep = new com.lowagie.text.pdf.draw.LineSeparator();
+            sep.setLineColor(new java.awt.Color(229, 231, 235));
+            sep.setPercentage(100);
+            sep.setLineWidth(0.5f);
+            document.add(sep);
+            document.add(new com.lowagie.text.Paragraph(" "));
+            Map<String, List<JournalImage>> imageMap = queryImagesForExport(userId, journals);
+            for (Journal j : journals) {
+                String dateStr = j.getJournalDate().format(DATE_FORMATTER);
+                String subject = StringUtils.defaultString(j.getSubject(), "");
+                String mood = StringUtils.defaultString(j.getMoodLabel(), j.getMoodValue());
+                String content = stripHtml(StringUtils.defaultString(j.getContent(), ""));
+                com.lowagie.text.Paragraph datePara = new com.lowagie.text.Paragraph(dateStr + "  ·  " + mood, metaFont);
+                datePara.setSpacingBefore(18);
+                datePara.setSpacingAfter(4);
+                document.add(datePara);
+                com.lowagie.text.Paragraph subjectPara = new com.lowagie.text.Paragraph(subject, subjectFont);
+                subjectPara.setSpacingAfter(8);
+                document.add(subjectPara);
+                if (StringUtils.isNotBlank(content)) {
+                    com.lowagie.text.Paragraph contentPara = new com.lowagie.text.Paragraph(content, contentFont);
+                    contentPara.setAlignment(com.lowagie.text.Element.ALIGN_JUSTIFIED);
+                    contentPara.setLeading(20);
+                    contentPara.setSpacingAfter(12);
+                    document.add(contentPara);
+                }
+                List<JournalImage> images = imageMap.getOrDefault(j.getId(), Collections.emptyList());
+                addImagesToPdf(document, images);
+                document.add(new com.lowagie.text.Paragraph(" "));
+            }
+            document.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            log.error("journal exportPdf error", e);
+            throw new BizException(50000, "导出PDF失败");
+        }
+    }
+
+    private String stripHtml(String html) {
+        if (html == null) return "";
+        return html.replaceAll("<[^>]+>", " ")
+                .replaceAll("&nbsp;", " ")
+                .replaceAll("&lt;", "<")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&amp;", "&")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
     private void validateSaveRequest(JournalSaveReqData data) {
         if (data == null) {
             throw new BizException(40000, "请求体不能为空");
@@ -460,6 +554,83 @@ public class JournalServiceImpl implements IJournalService {
             resData.setUpdatedAt(updatedAt.toString());
         }
         return resData;
+    }
+
+    private Map<String, List<JournalImage>> queryImagesForExport(String userId, List<Journal> journals) {
+        if (CollectionUtils.isEmpty(journals)) {
+            return Collections.emptyMap();
+        }
+        List<String> journalIds = journals.stream().map(Journal::getId).collect(Collectors.toList());
+        LambdaQueryWrapper<JournalImage> imageWrapper = new LambdaQueryWrapper<>();
+        imageWrapper.eq(JournalImage::getUserId, userId)
+                .eq(JournalImage::getStatus, 1)
+                .in(JournalImage::getJournalId, journalIds)
+                .orderByAsc(JournalImage::getSortOrder)
+                .orderByAsc(JournalImage::getId);
+        List<JournalImage> journalImages = journalImageMapper.selectList(imageWrapper);
+        Map<String, List<JournalImage>> imageMap = new HashMap<>();
+        for (JournalImage image : journalImages) {
+            imageMap.computeIfAbsent(image.getJournalId(), k -> new ArrayList<>()).add(image);
+        }
+        return imageMap;
+    }
+
+    private void addImagesToPdf(com.lowagie.text.Document document, List<JournalImage> images) {
+        if (CollectionUtils.isEmpty(images)) {
+            return;
+        }
+        float maxCellW = 150f;
+        float maxCellH = 150f;
+        int cols = 3;
+        com.lowagie.text.pdf.PdfPTable table = new com.lowagie.text.pdf.PdfPTable(cols);
+        table.setWidthPercentage(100f);
+        table.setSpacingBefore(8);
+        table.setSpacingAfter(8);
+        table.setHorizontalAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+        int cellsAdded = 0;
+        for (JournalImage img : images) {
+            if (img == null || StringUtils.isBlank(img.getFileId())) {
+                continue;
+            }
+            try {
+                UploadedFile uploadedFile = fileService.getByFileId(img.getFileId());
+                if (uploadedFile == null || StringUtils.isBlank(uploadedFile.getStoragePath())) {
+                    log.warn("pdf export: file not found, fileId={}", img.getFileId());
+                    continue;
+                }
+                Path path = Paths.get(uploadedFile.getStoragePath());
+                if (!Files.exists(path) || !Files.isReadable(path)) {
+                    log.warn("pdf export: file not readable, path={}", uploadedFile.getStoragePath());
+                    continue;
+                }
+                byte[] bytes = Files.readAllBytes(path);
+                com.lowagie.text.Image image = com.lowagie.text.Image.getInstance(bytes);
+                if (image.getWidth() > maxCellW || image.getHeight() > maxCellH) {
+                    image.scaleToFit(maxCellW, maxCellH);
+                }
+                image.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+                com.lowagie.text.pdf.PdfPCell cell = new com.lowagie.text.pdf.PdfPCell(image, true);
+                cell.setBorder(com.lowagie.text.Rectangle.NO_BORDER);
+                cell.setHorizontalAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(com.lowagie.text.Element.ALIGN_MIDDLE);
+                cell.setPadding(4);
+                table.addCell(cell);
+                cellsAdded++;
+            } catch (Exception e) {
+                log.warn("pdf export: add image failed, fileId={}", img.getFileId(), e);
+            }
+        }
+        if (cellsAdded == 0) {
+            return;
+        }
+        while (cellsAdded % cols != 0) {
+            com.lowagie.text.pdf.PdfPCell emptyCell = new com.lowagie.text.pdf.PdfPCell();
+            emptyCell.setBorder(com.lowagie.text.Rectangle.NO_BORDER);
+            emptyCell.setMinimumHeight(1);
+            table.addCell(emptyCell);
+            cellsAdded++;
+        }
+        document.add(table);
     }
 
     private Map<String, List<JournalImageResData>> queryImageMap(String userId, List<Journal> journals) {

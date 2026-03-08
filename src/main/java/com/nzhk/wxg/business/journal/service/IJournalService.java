@@ -17,4 +17,6 @@ public interface IJournalService {
     JournalListResData search(String userId, String subject, String keyword, String moodValue, String dateStart, String dateEnd, Integer pageNo, Integer pageSize);
 
     void delete(String userId, JournalDeleteReqData data);
+
+    byte[] exportPdf(String userId, String month);
 }

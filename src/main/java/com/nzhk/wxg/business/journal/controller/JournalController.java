@@ -12,6 +12,9 @@ import com.nzhk.wxg.common.info.RequestInfo;
 import com.nzhk.wxg.common.info.ResponseInfo;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -94,6 +97,24 @@ public class JournalController {
         } catch (Exception e) {
             log.error("journal search system error", e);
             return ResponseInfo.fail(50000, "服务器异常", null);
+        }
+    }
+
+    @GetMapping("/exportPdf")
+    public ResponseEntity<byte[]> exportPdf(@RequestParam("month") String month) {
+        try {
+            String userId = ContextCache.getUserId();
+            log.info("journal exportPdf request, userId:{}, month:{}", userId, month);
+            byte[] pdfBytes = journalService.exportPdf(userId, month);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", month + "_journal.pdf");
+            return ResponseEntity.ok().headers(headers).body(pdfBytes);
+        } catch (BizException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("journal exportPdf system error", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
