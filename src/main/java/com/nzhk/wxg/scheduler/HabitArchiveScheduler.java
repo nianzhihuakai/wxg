@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 习惯相关定时任务
- * 每天凌晨 00:01 自动归档 end_date 为昨天的习惯
+ * 每天 23:59 自动归档 end_date 为当天的习惯
  */
 @Slf4j
 @Component
@@ -18,9 +18,9 @@ public class HabitArchiveScheduler {
     private IHabitService habitService;
 
     /**
-     * 每天凌晨 00:01 执行：将 end_date=昨天 且 status=1 的习惯更新为 status=2（归档）
+     * 每天 23:59 执行：将 end_date=当天 且 status=1 的习惯更新为 status=2（归档）
      */
-    @Scheduled(cron = "0 1 0 * * ?")
+    @Scheduled(cron = "0 59 23 * * ?")
     public void autoArchiveEndedHabits() {
         log.info("habit archive scheduler start: auto archive ended habits");
         try {

@@ -47,7 +47,9 @@ public class HabitRemindScheduler {
                     continue;
                 }
                 boolean sent = subscribeMessageService.sendHabitRemind(
+                        user.getId(),
                         user.getOpenid(),
+                        habit.getId(),
                         habit.getName() != null ? habit.getName() : "习惯打卡"
                 );
                 if (sent) {

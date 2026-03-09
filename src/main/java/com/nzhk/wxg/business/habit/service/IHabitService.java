@@ -31,7 +31,7 @@ public interface IHabitService extends IService<Habit> {
     void deleteHabit(UpdateHabitReqData data);
 
     /**
-     * 定时任务：将 end_date 为昨天且 status=1 的习惯自动归档（status=2）
+     * 定时任务：将 end_date 为当天且 status=1 的习惯自动归档（status=2）
      */
     void autoArchiveEndedHabits();
 

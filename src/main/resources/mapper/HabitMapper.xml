@@ -15,13 +15,14 @@
         order by h.create_time desc
     </select>
     <select id="selectArchiveHabitList" resultType="com.nzhk.wxg.business.habit.bean.HabitListResData">
-        select h.* from habit h
+        select h.*, ht.name as habit_type_name from habit h
+        left join habit_type ht on h.habit_type_id = ht.id and ht.user_id = h.user_id
         <where>
             h.user_id = #{userId} and h.status = 2
             <if test="habitTypeId != '' and habitTypeId != null">
                 and h.habit_type_id = #{habitTypeId}
             </if>
         </where>
-        order by h.create_time desc
+        order by h.archive_date_time desc
     </select>
 </mapper>

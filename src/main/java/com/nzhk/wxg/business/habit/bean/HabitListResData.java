@@ -92,6 +92,12 @@ public class HabitListResData {
 
     private LocalDate endDate;
 
+    private LocalDateTime archiveDateTime;
+
+    private String habitTypeId;
+
+    private String habitTypeName;
+
     private String checkInId;
 
     private boolean alreadyCheckedInToday;

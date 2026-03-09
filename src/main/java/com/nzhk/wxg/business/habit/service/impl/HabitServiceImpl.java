@@ -88,6 +88,13 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
             f.setWeekCheckInCount(weekCountMap.getOrDefault(f.getId(), 0L).intValue());
             f.setMonthCheckInCount(monthCountMap.getOrDefault(f.getId(), 0L).intValue());
         });
+        // 今日休息(rest)或已完成(weekly_done/monthly_done)的习惯排到列表最后
+        habits.sort((a, b) -> {
+            boolean aTail = StringUtils.isNotBlank(a.getShowReason());
+            boolean bTail = StringUtils.isNotBlank(b.getShowReason());
+            if (aTail == bTail) return 0;
+            return aTail ? 1 : -1;
+        });
         return habits;
     }
 
@@ -158,8 +165,35 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
     public List<HabitListResData> getArchiveHabits(HabitListReqData data) {
         log.info("getArchiveHabits userId:{}", ContextCache.getUserId());
         List<HabitListResData> habits = baseMapper.selectArchiveHabitList(ContextCache.getUserId(), LocalDate.now(), data.getHabitTypeId());
+        LambdaQueryWrapper<HabitCheckIn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HabitCheckIn::getUserId, ContextCache.getUserId());
+        List<HabitCheckIn> allCheckIns = habitCheckInMapper.selectList(wrapper);
+        Map<String, List<HabitCheckIn>> habitIdMap = allCheckIns.stream().collect(Collectors.groupingBy(HabitCheckIn::getHabitId));
+        habits.forEach(f -> {
+            List<HabitCheckIn> checkIns = habitIdMap.get(f.getId());
+            if (CollectionUtils.isEmpty(checkIns)) return;
+            LocalDate calcStart = f.getStartDate() != null ? f.getStartDate() : (f.getCreateTime() != null ? f.getCreateTime().toLocalDate() : LocalDate.now());
+            LocalDate rawEnd = f.getEndDate();
+            boolean isLongTerm = rawEnd != null && (rawEnd.toString().startsWith("2099") || rawEnd.toString().startsWith("9999"));
+            LocalDate calcEnd = (rawEnd == null || isLongTerm) && f.getArchiveDateTime() != null
+                    ? f.getArchiveDateTime().toLocalDate()
+                    : (rawEnd != null ? rawEnd : LocalDate.now());
+            if (calcEnd.isBefore(calcStart)) calcEnd = calcStart;
+            int totalDays = (int) ChronoUnit.DAYS.between(calcStart, calcEnd) + 1;
+            LocalDate finalCalcEnd = calcEnd;
+            long checkInNum = checkIns.stream()
+                    .map(HabitCheckIn::getCheckInDate)
+                    .filter(d -> d != null && !d.isBefore(calcStart) && !d.isAfter(finalCalcEnd))
+                    .distinct()
+                    .count();
+            f.setTotalCheckInNum(totalDays);
+            f.setCheckInNum((int) checkInNum);
+        });
         return habits;
     }
+
+    /** 状态：已归档 */
+    private static final int STATUS_ARCHIVED = 2;
 
     @Override
     public HabitDetailResData getHabitById(HabitDetailReqData data) {
@@ -173,11 +207,33 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         List<HabitCheckIn> habitCheckIns = habitCheckInMapper.selectList(habitCheckInLambdaQueryWrapper);
 
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
-            habitDetailResData.setCheckInNum(habitCheckIns.size());
-            int totalDays = (int) ChronoUnit.DAYS.between(habitDetailResData.getCreateTime().toLocalDate(), LocalDate.now()) + 1;
+            LocalDate calcStart;
+            LocalDate calcEnd;
+            if (Integer.valueOf(STATUS_ARCHIVED).equals(habit.getStatus())) {
+                // 已归档：按习惯周期 startDate~endDate 计算
+                calcStart = habit.getStartDate() != null ? habit.getStartDate() : habit.getCreateTime().toLocalDate();
+                LocalDate rawEnd = habit.getEndDate();
+                boolean isLongTerm = rawEnd != null && (rawEnd.toString().startsWith("2099") || rawEnd.toString().startsWith("9999"));
+                calcEnd = (rawEnd == null || isLongTerm) && habit.getArchiveDateTime() != null
+                        ? habit.getArchiveDateTime().toLocalDate()
+                        : (rawEnd != null ? rawEnd : LocalDate.now());
+                if (calcEnd.isBefore(calcStart)) calcEnd = calcStart;
+            } else {
+                // 未归档：创建时间到今天
+                calcStart = habitDetailResData.getCreateTime().toLocalDate();
+                calcEnd = LocalDate.now();
+            }
+            int totalDays = (int) ChronoUnit.DAYS.between(calcStart, calcEnd) + 1;
+            LocalDate finalCalcEnd = calcEnd;
+            long checkInNum = habitCheckIns.stream()
+                    .map(HabitCheckIn::getCheckInDate)
+                    .filter(d -> d != null && !d.isBefore(calcStart) && !d.isAfter(finalCalcEnd))
+                    .distinct()
+                    .count();
             habitDetailResData.setTotalCheckInNum(totalDays);
-            if (0 != totalDays) {
-                habitDetailResData.setCheckInRate(new BigDecimal(habitCheckIns.size()).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            habitDetailResData.setCheckInNum((int) checkInNum);
+            if (totalDays > 0) {
+                habitDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays), 2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             }
         }
 
@@ -255,10 +311,10 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public void autoArchiveEndedHabits() {
-        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         LambdaUpdateWrapper<Habit> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(Habit::getEndDate, yesterday)
+        updateWrapper.eq(Habit::getEndDate, today)
                 .eq(Habit::getStatus, 1)
                 .set(Habit::getStatus, 2)
                 .set(Habit::getArchiveDateTime, now);

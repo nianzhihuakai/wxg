@@ -1,7 +1,10 @@
 package com.nzhk.wxg.wechat.service;
 
 import com.alibaba.fastjson.JSONObject;
+import com.nzhk.wxg.common.utils.IdUtil;
+import com.nzhk.wxg.mapper.SubscribeMessageLogMapper;
 import com.nzhk.wxg.wechat.config.WechatProperties;
+import com.nzhk.wxg.wechat.entity.SubscribeMessageLog;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -10,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -31,16 +35,20 @@ public class SubscribeMessageService {
     private WechatAccessTokenService wechatAccessTokenService;
     @Resource
     private RestTemplate restTemplate;
+    @Resource
+    private SubscribeMessageLogMapper subscribeMessageLogMapper;
 
     /**
      * 发送习惯提醒订阅消息
      * 模板：thing6=习惯名称，thing15=备注（微习惯打卡提醒），点击跳转首页打卡列表
      *
+     * @param userId    用户表 id，可为 null
      * @param openid    用户 openid
+     * @param habitId   习惯ID，可为 null
      * @param habitName 习惯名称
      * @return 是否发送成功
      */
-    public boolean sendHabitRemind(String openid, String habitName) {
+    public boolean sendHabitRemind(String userId, String openid, String habitId, String habitName) {
         String templateId = wechatProperties.getSubscribeTemplateId();
         if (templateId == null || templateId.isEmpty()) {
             log.warn("subscribe template id not configured");
@@ -51,7 +59,7 @@ public class SubscribeMessageService {
         data.put("thing6", Map.of("value", truncateThing(habitName, 20)));
         data.put("thing15", Map.of("value", truncateThing("微习惯打卡提醒", 20)));
 
-        return send(openid, templateId, data, "pages/home/home");
+        return send(userId, openid, templateId, data, "pages/home/home", "habit_remind", habitId, habitName);
     }
 
     private String truncateThing(String s, int maxLen) {
@@ -69,9 +77,27 @@ public class SubscribeMessageService {
      * @param page       点击跳转页面，可为 null
      */
     public boolean send(String openid, String templateId, Map<String, Object> data, String page) {
+        return send(null, openid, templateId, data, page, null, null, null);
+    }
+
+    /**
+     * 发送订阅消息并记录日志
+     *
+     * @param userId    用户表 id，可为 null
+     * @param openid    openid
+     * @param templateId 模板 id
+     * @param data      模板数据
+     * @param page      点击跳转页面，可为 null
+     * @param bizType   业务类型，可为 null
+     * @param bizId     业务ID，可为 null
+     * @param extraData 扩展数据，可为 null
+     */
+    public boolean send(String userId, String openid, String templateId, Map<String, Object> data, String page,
+                       String bizType, String bizId, String extraData) {
         String token = wechatAccessTokenService.getAccessToken();
         if (token == null) {
             log.warn("access_token is null, skip send");
+            saveLog(userId, openid, templateId, data, bizType, bizId, extraData, 0, 0, "access_token is null");
             return false;
         }
 
@@ -95,14 +121,42 @@ public class SubscribeMessageService {
             JSONObject obj = JSONObject.parseObject(resp);
             if (obj != null && obj.getIntValue("errcode") == 0) {
                 log.info("subscribe message sent, openid={}, templateId={}", openid, templateId);
+                saveLog(userId, openid, templateId, data, bizType, bizId, extraData, 1, null, null);
                 return true;
             } else {
+                int errcode = obj != null ? obj.getIntValue("errcode") : 0;
+                String errmsg = obj != null ? obj.getString("errmsg") : "unknown";
                 log.warn("subscribe message send failed: {}", resp);
+                saveLog(userId, openid, templateId, data, bizType, bizId, extraData, 0, errcode, errmsg);
                 return false;
             }
         } catch (Exception e) {
             log.error("subscribe message send error, openid=" + openid, e);
+            saveLog(userId, openid, templateId, data, bizType, bizId, extraData, 0, -1, e.getMessage());
             return false;
+        }
+    }
+
+    private void saveLog(String userId, String openid, String templateId, Map<String, Object> data,
+                        String bizType, String bizId, String extraData,
+                        int sendStatus, Integer errcode, String errmsg) {
+        try {
+            SubscribeMessageLog record = new SubscribeMessageLog();
+            record.setId(IdUtil.getId());
+            record.setUserId(userId);
+            record.setOpenid(openid);
+            record.setTemplateId(templateId);
+            record.setSendContent(data != null ? JSONObject.toJSONString(data) : null);
+            record.setBizType(bizType != null ? bizType : "");
+            record.setBizId(bizId);
+            record.setExtraData(truncateThing(extraData, 512));
+            record.setSendStatus(sendStatus);
+            record.setErrcode(errcode);
+            record.setErrmsg(truncateThing(errmsg, 256));
+            record.setCreatedAt(LocalDateTime.now());
+            subscribeMessageLogMapper.insert(record);
+        } catch (Exception e) {
+            log.error("save subscribe_message_log failed", e);
         }
     }
 }

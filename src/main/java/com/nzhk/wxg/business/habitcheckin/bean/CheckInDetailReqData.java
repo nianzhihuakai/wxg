@@ -16,4 +16,10 @@ public class CheckInDetailReqData {
     private LocalDate monthDate;
 
     private LocalDate yearDate;
+
+    /** 周期开始日期（可选，归档详情页传入，用于限制统计范围） */
+    private LocalDate periodStartDate;
+
+    /** 周期结束日期（可选，归档详情页传入，用于限制统计范围） */
+    private LocalDate periodEndDate;
 }

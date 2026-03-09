@@ -95,23 +95,36 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
     @Override
     public CheckInDetailResData getWeekCheckInInfo(CheckInDetailReqData data) {
         log.info("getWeekCheckInInfo userId:{}, habitId:{}, weekStart:{}, weekEnd:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getWeekStart() : null, data != null ? data.getWeekEnd() : null);
+        LocalDate qStart = data.getWeekStart();
+        LocalDate qEnd = data.getWeekEnd();
+        if (data.getPeriodStartDate() != null && data.getPeriodEndDate() != null) {
+            LocalDate effStart = qStart.isBefore(data.getPeriodStartDate()) ? data.getPeriodStartDate() : qStart;
+            LocalDate effEnd = qEnd.isAfter(data.getPeriodEndDate()) ? data.getPeriodEndDate() : qEnd;
+            if (effStart.isAfter(effEnd)) {
+                return new CheckInDetailResData();
+            }
+            qStart = effStart;
+            qEnd = effEnd;
+        }
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper
                 .eq(HabitCheckIn::getUserId, ContextCache.getUserId())
-                .ge(HabitCheckIn::getCheckInDate, data.getWeekStart())
-                .le(HabitCheckIn::getCheckInDate, data.getWeekEnd());
+                .ge(HabitCheckIn::getCheckInDate, qStart)
+                .le(HabitCheckIn::getCheckInDate, qEnd);
         if (StringUtils.isNotEmpty(data.getHabitId())) {
             habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId());
         }
         List<HabitCheckIn> habitCheckIns = baseMapper.selectList(habitCheckInLambdaQueryWrapper);
+        int totalDays = (int) ChronoUnit.DAYS.between(qStart, qEnd) + 1;
         CheckInDetailResData checkInDetailResData = new CheckInDetailResData();
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
             int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
             checkInDetailResData.setCheckInNum(checkInNum);
-            int totalDays = 7;
             checkInDetailResData.setTotalCheckInNum(totalDays);
-            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays), 2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
+        } else {
+            checkInDetailResData.setTotalCheckInNum(totalDays);
         }
         return checkInDetailResData;
     }
@@ -121,12 +134,23 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         log.info("getMonthCheckInInfo userId:{}, habitId:{}, monthDate:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getMonthDate() : null);
         LocalDate monthStartDate = data.getMonthDate();
         LocalDate monthEndDate = monthStartDate.plusMonths(1).minusDays(1);
-        int dayOfMonth = monthEndDate.getDayOfMonth();
+        LocalDate qStart = monthStartDate;
+        LocalDate qEnd = monthEndDate;
+        if (data.getPeriodStartDate() != null && data.getPeriodEndDate() != null) {
+            LocalDate effStart = monthStartDate.isBefore(data.getPeriodStartDate()) ? data.getPeriodStartDate() : monthStartDate;
+            LocalDate effEnd = monthEndDate.isAfter(data.getPeriodEndDate()) ? data.getPeriodEndDate() : monthEndDate;
+            if (effStart.isAfter(effEnd)) {
+                return new CheckInDetailResData();
+            }
+            qStart = effStart;
+            qEnd = effEnd;
+        }
+        int totalDays = (int) ChronoUnit.DAYS.between(qStart, qEnd) + 1;
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper
                 .eq(HabitCheckIn::getUserId, ContextCache.getUserId())
-                .ge(HabitCheckIn::getCheckInDate, monthStartDate)
-                .le(HabitCheckIn::getCheckInDate, monthEndDate);
+                .ge(HabitCheckIn::getCheckInDate, qStart)
+                .le(HabitCheckIn::getCheckInDate, qEnd);
         if (StringUtils.isNotEmpty(data.getHabitId())) {
             habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId());
         }
@@ -135,9 +159,11 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
             int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
             checkInDetailResData.setCheckInNum(checkInNum);
-            checkInDetailResData.setTotalCheckInNum(dayOfMonth);
-            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(dayOfMonth),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setTotalCheckInNum(totalDays);
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays), 2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
+        } else {
+            checkInDetailResData.setTotalCheckInNum(totalDays);
         }
         return checkInDetailResData;
     }
@@ -147,12 +173,23 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         log.info("getYearCheckInInfo userId:{}, habitId:{}, yearDate:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null, data != null ? data.getYearDate() : null);
         LocalDate yearStartDate = data.getYearDate();
         LocalDate yearEndDate = yearStartDate.plusYears(1).minusDays(1);
-        int dayOfYear = yearEndDate.getDayOfYear();
+        LocalDate qStart = yearStartDate;
+        LocalDate qEnd = yearEndDate;
+        if (data.getPeriodStartDate() != null && data.getPeriodEndDate() != null) {
+            LocalDate effStart = yearStartDate.isBefore(data.getPeriodStartDate()) ? data.getPeriodStartDate() : yearStartDate;
+            LocalDate effEnd = yearEndDate.isAfter(data.getPeriodEndDate()) ? data.getPeriodEndDate() : yearEndDate;
+            if (effStart.isAfter(effEnd)) {
+                return new CheckInDetailResData();
+            }
+            qStart = effStart;
+            qEnd = effEnd;
+        }
+        int totalDays = (int) ChronoUnit.DAYS.between(qStart, qEnd) + 1;
         LambdaQueryWrapper<HabitCheckIn> habitCheckInLambdaQueryWrapper = new LambdaQueryWrapper<>();
         habitCheckInLambdaQueryWrapper
                 .eq(HabitCheckIn::getUserId, ContextCache.getUserId())
-                .ge(HabitCheckIn::getCheckInDate, yearStartDate)
-                .le(HabitCheckIn::getCheckInDate, yearEndDate);
+                .ge(HabitCheckIn::getCheckInDate, qStart)
+                .le(HabitCheckIn::getCheckInDate, qEnd);
         if (StringUtils.isNotEmpty(data.getHabitId())) {
             habitCheckInLambdaQueryWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId());
         }
@@ -161,9 +198,11 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         if (!CollectionUtils.isEmpty(habitCheckIns)) {
             int checkInNum = habitCheckIns.stream().filter(Objects::nonNull).map(HabitCheckIn::getCheckInDate).distinct().toList().size();
             checkInDetailResData.setCheckInNum(checkInNum);
-            checkInDetailResData.setTotalCheckInNum(dayOfYear);
-            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(dayOfYear),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
+            checkInDetailResData.setTotalCheckInNum(totalDays);
+            checkInDetailResData.setCheckInRate(new BigDecimal(checkInNum).divide(new BigDecimal(totalDays), 2, RoundingMode.HALF_UP).multiply(new BigDecimal(100)));
             checkInDetailResData.setCheckInDate(habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).toList());
+        } else {
+            checkInDetailResData.setTotalCheckInNum(totalDays);
         }
         return checkInDetailResData;
     }
