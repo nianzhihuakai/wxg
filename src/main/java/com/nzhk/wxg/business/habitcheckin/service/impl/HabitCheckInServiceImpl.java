@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nzhk.wxg.business.habit.entity.Habit;
+import com.nzhk.wxg.business.habit.service.IHabitService;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailResData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
@@ -44,6 +45,9 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Resource
     private HabitMapper habitMapper;
+
+    @Resource
+    private IHabitService habitService;
 
     @Override
     public void checkIn(CheckInReqData data) {
@@ -89,7 +93,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
                     .eq(HabitCheckIn::getUserId, ContextCache.getUserId());
             baseMapper.delete(habitCheckInLambdaUpdateWrapper);
         }
-
+        habitService.updateStreak(data.getHabitId());
     }
 
     @Override

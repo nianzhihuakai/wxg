@@ -77,6 +77,12 @@ public class Habit implements Serializable {
     private Integer streakDays;
 
     /**
+     * 历史最高连续打卡天数
+     */
+    @ApiModelProperty("历史最高连续打卡天数")
+    private Integer maxStreakDays;
+
+    /**
      * 总打卡天数
      */
     @ApiModelProperty("总打卡天数")

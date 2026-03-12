@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nzhk.wxg.business.habit.bean.*;
 import com.nzhk.wxg.business.habit.entity.Habit;
 import com.nzhk.wxg.business.habit.service.IHabitService;
+import com.nzhk.wxg.business.habit.utils.StreakCalculator;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
 import com.nzhk.wxg.common.cache.ContextCache;
+import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.utils.BeanConvertUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.mapper.HabitCheckInMapper;
@@ -79,14 +81,16 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
             if (StringUtils.isNotEmpty(f.getCheckInId())) {
                 f.setAlreadyCheckedInToday(true);
             }
+            int totalDays = (int) ChronoUnit.DAYS.between(f.getCreateTime().toLocalDate(), now) + 1;
+            f.setTotalCheckInNum(totalDays);
             List<HabitCheckIn> habitCheckInsById = habitIdMap.get(f.getId());
             if (!CollectionUtils.isEmpty(habitCheckInsById)) {
                 f.setCheckInNum(habitCheckInsById.size());
-                int totalDays = (int) ChronoUnit.DAYS.between(f.getCreateTime().toLocalDate(), now) + 1;
-                f.setTotalCheckInNum(totalDays);
             }
             f.setWeekCheckInCount(weekCountMap.getOrDefault(f.getId(), 0L).intValue());
             f.setMonthCheckInCount(monthCountMap.getOrDefault(f.getId(), 0L).intValue());
+            if (f.getStreakDays() == null) f.setStreakDays(0);
+            if (f.getMaxStreakDays() == null) f.setMaxStreakDays(0);
         });
         // 今日休息(rest)或已完成(weekly_done/monthly_done)的习惯排到列表最后
         habits.sort((a, b) -> {
@@ -188,6 +192,8 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                     .count();
             f.setTotalCheckInNum(totalDays);
             f.setCheckInNum((int) checkInNum);
+            if (f.getStreakDays() == null) f.setStreakDays(0);
+            if (f.getMaxStreakDays() == null) f.setMaxStreakDays(0);
         });
         return habits;
     }
@@ -250,13 +256,25 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .count();
         habitDetailResData.setWeekCheckInCount((int) weekCount);
         habitDetailResData.setMonthCheckInCount((int) monthCount);
+        if (habitDetailResData.getStreakDays() == null) habitDetailResData.setStreakDays(0);
+        if (habitDetailResData.getMaxStreakDays() == null) habitDetailResData.setMaxStreakDays(0);
 
         return habitDetailResData;
     }
 
+    private static final int MAX_HABIT_COUNT = 10;
+
     @Override
     public void addHabit(AddHabitReqData data) {
         log.info("addHabit userId:{}, name:{}, habitTypeId:{}", ContextCache.getUserId(), data != null ? data.getName() : null, data != null ? data.getHabitTypeId() : null);
+        String userId = ContextCache.getUserId();
+        long count = this.lambdaQuery()
+                .eq(Habit::getUserId, userId)
+                .eq(Habit::getStatus, 1)
+                .count();
+        if (count >= MAX_HABIT_COUNT) {
+            throw new BizException(40000, "最多只能创建10个习惯");
+        }
         Habit habit = new Habit();
         habit.setId(IdUtil.getId());
         habit.setName(data.getName());
@@ -270,6 +288,8 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setCheckInFrequencyType(type);
         String freq = data.getCheckInFrequency();
         habit.setCheckInFrequency(parseFrequencyForSave(type, freq));
+        habit.setStreakDays(0);
+        habit.setMaxStreakDays(0);
         baseMapper.insert(habit);
     }
 
@@ -334,5 +354,47 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .le(Habit::getStartDate, today)
                 .ge(Habit::getEndDate, today);
         return baseMapper.selectList(q);
+    }
+
+    @Override
+    public void updateStreak(String habitId) {
+        if (StringUtils.isBlank(habitId)) return;
+        Habit habit = baseMapper.selectById(habitId);
+        if (habit == null) return;
+
+        LambdaQueryWrapper<HabitCheckIn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HabitCheckIn::getHabitId, habitId)
+                .eq(HabitCheckIn::getUserId, ContextCache.getUserId());
+        List<HabitCheckIn> checkIns = habitCheckInMapper.selectList(wrapper);
+        List<LocalDate> checkInDates = checkIns.stream()
+                .map(HabitCheckIn::getCheckInDate)
+                .filter(d -> d != null)
+                .distinct()
+                .toList();
+
+        LocalDate today = LocalDate.now();
+        boolean todayCheckedIn = checkInDates.stream().anyMatch(d -> d.equals(today));
+
+        LocalDate startDate = habit.getStartDate() != null ? habit.getStartDate() : (habit.getCreateTime() != null ? habit.getCreateTime().toLocalDate() : today);
+        LocalDate endDate = habit.getEndDate();
+
+        int newStreak = StreakCalculator.compute(
+                checkInDates,
+                startDate,
+                endDate,
+                habit.getCheckInFrequencyType(),
+                habit.getCheckInFrequency(),
+                today,
+                todayCheckedIn
+        );
+
+        int oldMax = habit.getMaxStreakDays() != null ? habit.getMaxStreakDays() : 0;
+        int newMax = Math.max(oldMax, newStreak);
+
+        LambdaUpdateWrapper<Habit> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(Habit::getId, habitId)
+                .set(Habit::getStreakDays, newStreak)
+                .set(Habit::getMaxStreakDays, newMax);
+        baseMapper.update(null, updateWrapper);
     }
 }

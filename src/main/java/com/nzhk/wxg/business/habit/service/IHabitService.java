@@ -42,4 +42,11 @@ public interface IHabitService extends IService<Habit> {
      * @return 需要提醒的习惯列表
      */
     List<Habit> listHabitsNeedRemind(String remindTime);
+
+    /**
+     * 根据最新打卡记录重新计算并更新习惯的 streak_days 和 max_streak_days
+     *
+     * @param habitId 习惯ID
+     */
+    void updateStreak(String habitId);
 }
