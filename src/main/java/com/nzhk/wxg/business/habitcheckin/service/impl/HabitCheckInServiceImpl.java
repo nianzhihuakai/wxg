@@ -8,6 +8,7 @@ import com.nzhk.wxg.business.habit.service.IHabitService;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailResData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.HabitRankItem;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
 import com.nzhk.wxg.business.habitcheckin.service.IHabitCheckInService;
@@ -231,17 +232,17 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
             HabitCheckIn maxCheckInDateTime = habitCheckIns.stream().filter(f -> null != f.getCheckInTime()).max(Comparator.comparing(HabitCheckIn::getCheckInTime)).get();
             Map<String, Long> habitIdCountMap = habitCheckIns.stream().collect(Collectors.groupingBy(HabitCheckIn::getHabitId, Collectors.counting()));
             String mostKey = habitIdCountMap.entrySet().stream()
-                    .max(Map.Entry.comparingByValue()) // 找到值（出现次数）最大的entry
-                    .map(Map.Entry::getKey) // 获取这个entry的key
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
                     .orElse(null);
             String lessKey = habitIdCountMap.entrySet().stream()
-                    .min(Map.Entry.comparingByValue()) // 找到值（出现次数）最大的entry
-                    .map(Map.Entry::getKey) // 获取这个entry的key
+                    .min(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
                     .orElse(null);
 
             int totalDays = (int) ChronoUnit.DAYS.between(minCheckInDateTime.getCheckInTime().toLocalDate(), LocalDate.now()) + 1;
             int checkInDays = habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).distinct().toList().size();
-            BigDecimal checkInRate = new BigDecimal(checkInDays).divide(new BigDecimal(totalDays),2, RoundingMode.HALF_UP).multiply(new BigDecimal(100));
+            BigDecimal checkInRate = new BigDecimal(checkInDays).divide(new BigDecimal(totalDays), 2, RoundingMode.HALF_UP).multiply(new BigDecimal(100));
 
             statisticsInfoResData.setFirstCheckInDateTime(NzhkDateUtil.getDateTimeStrByLocalDateTime(minCheckInDateTime.getCheckInTime()));
             statisticsInfoResData.setLastCheckInDateTime(NzhkDateUtil.getDateTimeStrByLocalDateTime(maxCheckInDateTime.getCheckInTime()));
@@ -250,7 +251,72 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
             statisticsInfoResData.setTotalCheckInDays(totalDays);
             statisticsInfoResData.setCheckInNumDays(checkInDays);
             statisticsInfoResData.setCheckInRate(checkInRate);
+
+            // 连续打卡天数、最长连续、里程碑、习惯排行
+            List<LocalDate> distinctDates = habitCheckIns.stream().map(HabitCheckIn::getCheckInDate).filter(Objects::nonNull).distinct().sorted().toList();
+            int currentStreak = computeCurrentStreak(distinctDates);
+            int maxStreak = computeMaxStreak(distinctDates);
+            statisticsInfoResData.setCurrentStreakDays(currentStreak);
+            statisticsInfoResData.setMaxStreakDays(maxStreak);
+
+            int[] milestones = {7, 30, 100, 365, 1000};
+            List<String> achieved = new ArrayList<>();
+            String next = null;
+            for (int m : milestones) {
+                if (checkInDays >= m) {
+                    achieved.add(m + "天");
+                } else if (next == null) {
+                    next = m + "天";
+                    break;
+                }
+            }
+            statisticsInfoResData.setAchievedMilestones(achieved);
+            statisticsInfoResData.setNextMilestone(next);
+
+            Map<String, String> finalHabitIdNameMap = habitIdNameMap;
+            List<HabitRankItem> ranking = habitIdCountMap.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(5)
+                    .map(e -> new HabitRankItem(finalHabitIdNameMap.getOrDefault(e.getKey(), "未知"), e.getValue()))
+                    .collect(Collectors.toList());
+            statisticsInfoResData.setHabitRanking(ranking);
         }
+        statisticsInfoResData.setTotalCheckInCount(CollectionUtils.isEmpty(habitCheckIns) ? 0 : habitCheckIns.size());
+        statisticsInfoResData.setHabitCount(CollectionUtils.isEmpty(habits) ? 0 : habits.size());
         return statisticsInfoResData;
+    }
+
+    /**
+     * 计算当前连续打卡天数：从今天（若今日已打卡）或昨天开始向前，连续多少天都有打卡
+     */
+    private int computeCurrentStreak(List<LocalDate> distinctDates) {
+        if (CollectionUtils.isEmpty(distinctDates)) return 0;
+        Set<LocalDate> dateSet = new HashSet<>(distinctDates);
+        LocalDate today = LocalDate.now();
+        LocalDate cursor = dateSet.contains(today) ? today : today.minusDays(1);
+        int streak = 0;
+        while (dateSet.contains(cursor)) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
+    }
+
+    /**
+     * 计算最长连续打卡天数
+     */
+    private int computeMaxStreak(List<LocalDate> distinctDates) {
+        if (CollectionUtils.isEmpty(distinctDates)) return 0;
+        int maxStreak = 1;
+        int current = 1;
+        for (int i = 1; i < distinctDates.size(); i++) {
+            if (ChronoUnit.DAYS.between(distinctDates.get(i - 1), distinctDates.get(i)) == 1) {
+                current++;
+            } else {
+                maxStreak = Math.max(maxStreak, current);
+                current = 1;
+            }
+        }
+        return Math.max(maxStreak, current);
     }
 }
