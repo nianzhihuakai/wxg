@@ -262,7 +262,7 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         return habitDetailResData;
     }
 
-    private static final int MAX_HABIT_COUNT = 10;
+    private static final int MAX_HABIT_COUNT = 30;
 
     @Override
     public void addHabit(AddHabitReqData data) {
@@ -273,7 +273,7 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
                 .eq(Habit::getStatus, 1)
                 .count();
         if (count >= MAX_HABIT_COUNT) {
-            throw new BizException(40000, "最多只能创建10个习惯");
+            throw new BizException(40000, "最多只能创建30个习惯");
         }
         Habit habit = new Habit();
         habit.setId(IdUtil.getId());
