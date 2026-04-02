@@ -26,8 +26,10 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -259,6 +261,18 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         if (habitDetailResData.getStreakDays() == null) habitDetailResData.setStreakDays(0);
         if (habitDetailResData.getMaxStreakDays() == null) habitDetailResData.setMaxStreakDays(0);
 
+        if (!CollectionUtils.isEmpty(habitCheckIns)) {
+            habitDetailResData.setCheckInDates(habitCheckIns.stream()
+                    .map(HabitCheckIn::getCheckInDate)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .sorted()
+                    .map(LocalDate::toString)
+                    .toList());
+        } else {
+            habitDetailResData.setCheckInDates(Collections.emptyList());
+        }
+
         return habitDetailResData;
     }
 
@@ -288,6 +302,7 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
         habit.setCheckInFrequencyType(type);
         String freq = data.getCheckInFrequency();
         habit.setCheckInFrequency(parseFrequencyForSave(type, freq));
+        habit.setPromptCheckinReflection(Boolean.TRUE.equals(data.getPromptCheckinReflection()));
         habit.setStreakDays(0);
         habit.setMaxStreakDays(0);
         baseMapper.insert(habit);
@@ -308,6 +323,9 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
             String freq = parseFrequencyForSave(type, data.getCheckInFrequency());
             habitLambdaUpdateWrapper.set(Habit::getCheckInFrequencyType, type);
             habitLambdaUpdateWrapper.set(Habit::getCheckInFrequency, freq);
+        }
+        if (data.getPromptCheckinReflection() != null) {
+            habitLambdaUpdateWrapper.set(Habit::getPromptCheckinReflection, Boolean.TRUE.equals(data.getPromptCheckinReflection()));
         }
         baseMapper.update(habitLambdaUpdateWrapper);
     }

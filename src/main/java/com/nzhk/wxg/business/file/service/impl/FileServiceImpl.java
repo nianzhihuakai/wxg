@@ -38,7 +38,7 @@ public class FileServiceImpl implements IFileService {
 
     private static final long MAX_SIZE = 10L * 1024 * 1024;
     private static final Set<String> ALLOW_EXT = Set.of("jpg", "jpeg", "png", "webp");
-    private static final Set<String> ALLOW_BIZ_TYPE = Set.of("journal", "avatar");
+    private static final Set<String> ALLOW_BIZ_TYPE = Set.of("journal", "avatar", "habit_reflection");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     @Value("${wxg.file.storage-dir:uploads}")

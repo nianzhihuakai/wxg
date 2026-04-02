@@ -2,6 +2,11 @@ package com.nzhk.wxg.business.habitcheckin.controller;
 
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionGetReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionItemResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
 import com.nzhk.wxg.business.habitcheckin.service.IHabitCheckInService;
@@ -66,5 +71,24 @@ public class HabitCheckInController {
     public ResponseInfo<StatisticsInfoResData> getStatisticsInfo () {
         log.info("getStatisticsInfo request");
         return ResponseInfo.success(habitCheckInService.getStatisticsInfo());
+    }
+
+    @PostMapping("saveReflection")
+    public ResponseInfo<Void> saveReflection(@RequestBody RequestInfo<CheckInReflectionSaveReqData> requestInfo) {
+        log.info("saveReflection request");
+        habitCheckInService.saveReflection(requestInfo.getData());
+        return ResponseInfo.success(null);
+    }
+
+    @PostMapping("getReflection")
+    public ResponseInfo<CheckInReflectionItemResData> getReflection(@RequestBody RequestInfo<CheckInReflectionGetReqData> requestInfo) {
+        log.info("getReflection request");
+        return ResponseInfo.success(habitCheckInService.getReflection(requestInfo.getData()));
+    }
+
+    @PostMapping("listReflections")
+    public ResponseInfo<CheckInReflectionListResData> listReflections(@RequestBody RequestInfo<CheckInReflectionListReqData> requestInfo) {
+        log.info("listReflections request");
+        return ResponseInfo.success(habitCheckInService.listReflections(requestInfo.getData()));
     }
 }

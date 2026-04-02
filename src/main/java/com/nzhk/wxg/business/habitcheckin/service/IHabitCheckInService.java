@@ -3,6 +3,11 @@ package com.nzhk.wxg.business.habitcheckin.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionGetReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionItemResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
@@ -28,4 +33,10 @@ public interface IHabitCheckInService extends IService<HabitCheckIn> {
     CheckInDetailResData getYearCheckInInfo(CheckInDetailReqData data);
 
     StatisticsInfoResData getStatisticsInfo();
+
+    void saveReflection(CheckInReflectionSaveReqData data);
+
+    CheckInReflectionItemResData getReflection(CheckInReflectionGetReqData data);
+
+    CheckInReflectionListResData listReflections(CheckInReflectionListReqData data);
 }

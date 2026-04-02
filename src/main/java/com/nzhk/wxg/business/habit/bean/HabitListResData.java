@@ -138,4 +138,7 @@ public class HabitListResData {
     /** 本月打卡次数（用于 monthly 类型展示 5/15） */
     @ApiModelProperty("本月打卡次数")
     private Integer monthCheckInCount;
+
+    @ApiModelProperty("打卡成功后是否弹出写感悟")
+    private Boolean promptCheckinReflection;
 }

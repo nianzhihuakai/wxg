@@ -26,4 +26,7 @@ public class UpdateHabitReqData {
 
     /** 打卡频次 */
     private String checkInFrequency;
+
+    /** 打卡成功后是否弹出写感悟 */
+    private Boolean promptCheckinReflection;
 }

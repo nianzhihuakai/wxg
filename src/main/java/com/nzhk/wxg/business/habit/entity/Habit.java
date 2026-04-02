@@ -138,4 +138,10 @@ public class Habit implements Serializable {
     @ApiModelProperty("打卡频次")
     private String checkInFrequency;
 
+    /**
+     * 打卡成功后是否弹出写感悟
+     */
+    @ApiModelProperty("打卡成功后是否弹出写感悟")
+    private Boolean promptCheckinReflection;
+
 }

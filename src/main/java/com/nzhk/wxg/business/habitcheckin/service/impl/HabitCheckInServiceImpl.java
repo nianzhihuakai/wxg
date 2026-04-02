@@ -2,17 +2,27 @@ package com.nzhk.wxg.business.habitcheckin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.nzhk.wxg.business.habit.entity.Habit;
 import com.nzhk.wxg.business.habit.service.IHabitService;
+import com.nzhk.wxg.business.file.entity.UploadedFile;
+import com.nzhk.wxg.business.file.service.IFileService;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInDetailResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionGetReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionItemResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListReqData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListResData;
+import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.HabitRankItem;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
 import com.nzhk.wxg.business.habitcheckin.service.IHabitCheckInService;
 import com.nzhk.wxg.common.cache.ContextCache;
+import com.nzhk.wxg.common.exception.BizException;
+import com.nzhk.wxg.common.utils.FileSignUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.NzhkDateUtil;
 import com.nzhk.wxg.mapper.HabitCheckInMapper;
@@ -49,6 +59,12 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
 
     @Resource
     private IHabitService habitService;
+
+    @Resource
+    private IFileService fileService;
+
+    @Resource
+    private FileSignUtil fileSignUtil;
 
     @Override
     public void checkIn(CheckInReqData data) {
@@ -318,5 +334,116 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
             }
         }
         return Math.max(maxStreak, current);
+    }
+
+    @Override
+    public void saveReflection(CheckInReflectionSaveReqData data) {
+        String userId = ContextCache.getUserId();
+        if (data == null || StringUtils.isBlank(data.getHabitId()) || data.getCheckInDate() == null) {
+            throw new BizException(40000, "参数错误");
+        }
+        Habit habit = habitMapper.selectById(data.getHabitId());
+        if (habit == null || !StringUtils.equals(habit.getUserId(), userId)) {
+            throw new BizException(40400, "习惯不存在");
+        }
+        LambdaQueryWrapper<HabitCheckIn> q = new LambdaQueryWrapper<>();
+        q.eq(HabitCheckIn::getHabitId, data.getHabitId())
+                .eq(HabitCheckIn::getCheckInDate, data.getCheckInDate())
+                .eq(HabitCheckIn::getUserId, userId);
+        HabitCheckIn row = baseMapper.selectOne(q);
+        if (row == null) {
+            throw new BizException(40400, "该日期尚未打卡");
+        }
+        boolean touchText = data.getReflection() != null;
+        boolean touchImg = Boolean.TRUE.equals(data.getUpdateImage());
+        if (!touchText && !touchImg) {
+            return;
+        }
+        LambdaUpdateWrapper<HabitCheckIn> uw = new LambdaUpdateWrapper<>();
+        uw.eq(HabitCheckIn::getId, row.getId());
+        if (touchText) {
+            String trimmed = data.getReflection().trim();
+            if (trimmed.length() > 100) {
+                throw new BizException(40000, "感悟不超过100字");
+            }
+            uw.set(HabitCheckIn::getReflection, trimmed.isEmpty() ? null : trimmed);
+        }
+        if (touchImg) {
+            String fid = data.getImageFileId();
+            if (StringUtils.isBlank(fid)) {
+                uw.set(HabitCheckIn::getReflectionImageUrl, null);
+            } else {
+                UploadedFile uf = fileService.getByFileId(fid.trim());
+                if (uf == null || !StringUtils.equals(uf.getUserId(), userId)
+                        || !StringUtils.equals(uf.getBizType(), "habit_reflection")) {
+                    throw new BizException(40000, "图片无效");
+                }
+                uw.set(HabitCheckIn::getReflectionImageUrl, uf.getUrl());
+            }
+        }
+        baseMapper.update(null, uw);
+    }
+
+    @Override
+    public CheckInReflectionItemResData getReflection(CheckInReflectionGetReqData data) {
+        String userId = ContextCache.getUserId();
+        if (data == null || StringUtils.isBlank(data.getHabitId()) || data.getCheckInDate() == null) {
+            throw new BizException(40000, "参数错误");
+        }
+        Habit habit = habitMapper.selectById(data.getHabitId());
+        if (habit == null || !StringUtils.equals(habit.getUserId(), userId)) {
+            throw new BizException(40400, "习惯不存在");
+        }
+        LambdaQueryWrapper<HabitCheckIn> q = new LambdaQueryWrapper<>();
+        q.eq(HabitCheckIn::getHabitId, data.getHabitId())
+                .eq(HabitCheckIn::getCheckInDate, data.getCheckInDate())
+                .eq(HabitCheckIn::getUserId, userId);
+        HabitCheckIn row = baseMapper.selectOne(q);
+        if (row == null) {
+            throw new BizException(40400, "该日期尚未打卡");
+        }
+        CheckInReflectionItemResData res = new CheckInReflectionItemResData();
+        res.setCheckInDate(row.getCheckInDate());
+        res.setReflection(row.getReflection());
+        String imgUrl = row.getReflectionImageUrl();
+        res.setReflectionImageUrl(StringUtils.isNotBlank(imgUrl) ? fileSignUtil.signFileUrlIfNeeded(imgUrl) : imgUrl);
+        return res;
+    }
+
+    @Override
+    public CheckInReflectionListResData listReflections(CheckInReflectionListReqData data) {
+        String userId = ContextCache.getUserId();
+        if (data == null || StringUtils.isBlank(data.getHabitId())) {
+            throw new BizException(40000, "参数错误");
+        }
+        Habit habit = habitMapper.selectById(data.getHabitId());
+        if (habit == null || !StringUtils.equals(habit.getUserId(), userId)) {
+            throw new BizException(40400, "习惯不存在");
+        }
+        int pageNo = data.getPageNo() == null || data.getPageNo() < 1 ? 1 : data.getPageNo();
+        int pageSize = data.getPageSize() == null || data.getPageSize() < 1 ? 20 : Math.min(data.getPageSize(), 50);
+        LambdaQueryWrapper<HabitCheckIn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HabitCheckIn::getUserId, userId)
+                .eq(HabitCheckIn::getHabitId, data.getHabitId())
+                .and(w -> w.and(w1 -> w1.isNotNull(HabitCheckIn::getReflection).ne(HabitCheckIn::getReflection, ""))
+                        .or(w2 -> w2.isNotNull(HabitCheckIn::getReflectionImageUrl).ne(HabitCheckIn::getReflectionImageUrl, "")))
+                .orderByDesc(HabitCheckIn::getCheckInDate);
+        Page<HabitCheckIn> page = baseMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+        CheckInReflectionListResData res = new CheckInReflectionListResData();
+        res.setTotal(page.getTotal());
+        if (CollectionUtils.isEmpty(page.getRecords())) {
+            res.setRecords(Collections.emptyList());
+            return res;
+        }
+        List<CheckInReflectionItemResData> items = page.getRecords().stream().map(r -> {
+            CheckInReflectionItemResData it = new CheckInReflectionItemResData();
+            it.setCheckInDate(r.getCheckInDate());
+            it.setReflection(r.getReflection());
+            String url = r.getReflectionImageUrl();
+            it.setReflectionImageUrl(StringUtils.isNotBlank(url) ? fileSignUtil.signFileUrlIfNeeded(url) : url);
+            return it;
+        }).toList();
+        res.setRecords(items);
+        return res;
     }
 }

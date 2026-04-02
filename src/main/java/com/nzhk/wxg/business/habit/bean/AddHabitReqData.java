@@ -26,4 +26,7 @@ public class AddHabitReqData {
 
     /** 打卡频次：fixed时为"1,2,3,4,5,6,7"；weekly时为1-7；monthly时为1-31 */
     private String checkInFrequency;
+
+    /** 打卡成功后是否弹出写感悟，默认 false */
+    private Boolean promptCheckinReflection;
 }

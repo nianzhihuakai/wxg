@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class HabitDetailResData {
@@ -125,4 +126,10 @@ public class HabitDetailResData {
     /** 本月打卡次数（用于 monthly 类型展示 5/15） */
     @ApiModelProperty("本月打卡次数")
     private Integer monthCheckInCount;
+
+    @ApiModelProperty("打卡成功后是否弹出写感悟")
+    private Boolean promptCheckinReflection;
+
+    @ApiModelProperty("已打卡日期 yyyy-MM-dd 列表")
+    private List<String> checkInDates;
 }

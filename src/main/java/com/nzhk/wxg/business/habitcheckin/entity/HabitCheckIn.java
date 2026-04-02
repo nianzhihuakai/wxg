@@ -62,4 +62,10 @@ public class HabitCheckIn implements Serializable {
 
     @ApiModelProperty("打卡类型 1-普通打卡 2-补卡")
     private Integer checkInType;
+
+    @ApiModelProperty("打卡感悟，最多100字")
+    private String reflection;
+
+    @ApiModelProperty("感悟配图 URL")
+    private String reflectionImageUrl;
 }
