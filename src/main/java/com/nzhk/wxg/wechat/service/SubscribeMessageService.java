@@ -62,6 +62,22 @@ public class SubscribeMessageService {
         return send(userId, openid, templateId, data, "pages/home/home", "habit_remind", habitId, habitName);
     }
 
+    /**
+     * 发送专注结束提醒订阅消息
+     * 模板字段沿用现有配置：thing6=习惯名称，thing15=提示语
+     */
+    public boolean sendFocusFinish(String userId, String openid, String habitId, String habitName) {
+        String templateId = wechatProperties.getSubscribeTemplateId();
+        if (templateId == null || templateId.isEmpty()) {
+            log.warn("subscribe template id not configured");
+            return false;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("thing6", Map.of("value", truncateThing(habitName, 20)));
+        data.put("thing15", Map.of("value", truncateThing("专注时间已结束", 20)));
+        return send(userId, openid, templateId, data, "pages/home/home", "focus_finish", habitId, habitName);
+    }
+
     private String truncateThing(String s, int maxLen) {
         if (s == null) return "";
         if (s.length() <= maxLen) return s;
