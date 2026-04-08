@@ -14,7 +14,10 @@ public class FocusSession implements Serializable {
     private String id;
     private String userId;
     private String habitId;
+    /** COUNTDOWN | STOPWATCH */
+    private String focusMode;
     private Integer plannedMinutes;
+    private Integer targetMinutes;
     private Integer actualSeconds;
     /** 1-running 2-paused 3-finished 4-cancelled */
     private Integer status;

@@ -8,7 +8,9 @@ import java.time.OffsetDateTime;
 public class FocusSessionResData {
     private String sessionId;
     private String habitId;
+    private String focusMode;
     private Integer plannedMinutes;
+    private Integer targetMinutes;
     private Integer actualSeconds;
     private Integer status;
     private OffsetDateTime startTime;

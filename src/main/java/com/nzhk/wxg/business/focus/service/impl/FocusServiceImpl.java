@@ -34,6 +34,8 @@ public class FocusServiceImpl implements IFocusService {
     private static final int STATUS_PAUSED = 2;
     private static final int STATUS_FINISHED = 3;
     private static final int STATUS_CANCELLED = 4;
+    private static final String MODE_COUNTDOWN = "COUNTDOWN";
+    private static final String MODE_STOPWATCH = "STOPWATCH";
 
     @Resource
     private FocusSessionMapper focusSessionMapper;
@@ -47,9 +49,23 @@ public class FocusServiceImpl implements IFocusService {
         if (data == null || StringUtils.isBlank(data.getHabitId())) {
             throw new BizException(40000, "habitId不能为空");
         }
-        int plannedMinutes = data.getPlannedMinutes() == null ? 25 : data.getPlannedMinutes();
-        if (plannedMinutes <= 0 || plannedMinutes > 720) {
-            throw new BizException(40000, "plannedMinutes范围不合法");
+        String focusMode = StringUtils.isBlank(data.getFocusMode()) ? MODE_COUNTDOWN : data.getFocusMode().trim().toUpperCase(Locale.ROOT);
+        if (!MODE_COUNTDOWN.equals(focusMode) && !MODE_STOPWATCH.equals(focusMode)) {
+            throw new BizException(40000, "focusMode不合法");
+        }
+        Integer targetMinutes = data.getTargetMinutes();
+        if (targetMinutes != null && (targetMinutes <= 0 || targetMinutes > 720)) {
+            throw new BizException(40000, "targetMinutes范围不合法");
+        }
+        Integer plannedMinutes;
+        if (MODE_COUNTDOWN.equals(focusMode)) {
+            plannedMinutes = data.getPlannedMinutes() == null ? 25 : data.getPlannedMinutes();
+            if (plannedMinutes <= 0 || plannedMinutes > 720) {
+                throw new BizException(40000, "plannedMinutes范围不合法");
+            }
+        } else {
+            // 正计时 planned_minutes 语义上留空
+            plannedMinutes = null;
         }
         String userId = ContextCache.getUserId();
         Habit habit = habitMapper.selectById(data.getHabitId());
@@ -70,11 +86,18 @@ public class FocusServiceImpl implements IFocusService {
         s.setId(IdUtil.getId());
         s.setUserId(userId);
         s.setHabitId(data.getHabitId());
+        s.setFocusMode(focusMode);
         s.setPlannedMinutes(plannedMinutes);
+        s.setTargetMinutes(targetMinutes);
         s.setActualSeconds(0);
         s.setStatus(STATUS_RUNNING);
         s.setStartTime(now);
-        s.setExpectedEndTime(now.plusMinutes(plannedMinutes));
+        if (MODE_COUNTDOWN.equals(focusMode)) {
+            s.setExpectedEndTime(now.plusMinutes(plannedMinutes));
+        } else {
+            // 正计时：有目标则设置预计结束时间，无目标则留空
+            s.setExpectedEndTime(targetMinutes == null ? null : now.plusMinutes(targetMinutes));
+        }
         s.setPauseTotalSeconds(0);
         s.setRemindSound(data.getRemindSound() == null || data.getRemindSound());
         s.setRemindVibrate(data.getRemindVibrate() == null || data.getRemindVibrate());
@@ -106,7 +129,9 @@ public class FocusServiceImpl implements IFocusService {
         s.setPauseTotalSeconds((s.getPauseTotalSeconds() == null ? 0 : s.getPauseTotalSeconds()) + pauseSeconds);
         s.setPauseStartTime(null);
         s.setStatus(STATUS_RUNNING);
-        s.setExpectedEndTime(s.getExpectedEndTime().plusSeconds(pauseSeconds));
+        if (s.getExpectedEndTime() != null) {
+            s.setExpectedEndTime(s.getExpectedEndTime().plusSeconds(pauseSeconds));
+        }
         focusSessionMapper.updateById(s);
         return toRes(s);
     }
@@ -114,6 +139,9 @@ public class FocusServiceImpl implements IFocusService {
     @Override
     public FocusSessionResData adjust(FocusAdjustReqData data) {
         FocusSession s = getMineSession(data == null ? null : data.getSessionId());
+        if (MODE_STOPWATCH.equalsIgnoreCase(s.getFocusMode())) {
+            throw new BizException(40000, "正计时模式不支持调时长");
+        }
         if (s.getStatus() != STATUS_RUNNING && s.getStatus() != STATUS_PAUSED) {
             throw new BizException(40000, "当前状态不支持调时长");
         }
@@ -122,7 +150,9 @@ public class FocusServiceImpl implements IFocusService {
         int next = Math.max(1, Math.min(720, (s.getPlannedMinutes() == null ? 25 : s.getPlannedMinutes()) + delta));
         int realDelta = next - (s.getPlannedMinutes() == null ? 25 : s.getPlannedMinutes());
         s.setPlannedMinutes(next);
-        s.setExpectedEndTime(s.getExpectedEndTime().plusMinutes(realDelta));
+        if (s.getExpectedEndTime() != null) {
+            s.setExpectedEndTime(s.getExpectedEndTime().plusMinutes(realDelta));
+        }
         focusSessionMapper.updateById(s);
         return toRes(s);
     }
@@ -241,6 +271,7 @@ public class FocusServiceImpl implements IFocusService {
         q.eq(FocusSession::getStatus, STATUS_RUNNING)
                 .eq(FocusSession::getRemindSubscribe, true)
                 .eq(FocusSession::getRemindSentFlag, false)
+                .isNotNull(FocusSession::getExpectedEndTime)
                 .le(FocusSession::getExpectedEndTime, OffsetDateTime.now(ZONE))
                 .orderByAsc(FocusSession::getExpectedEndTime);
         return focusSessionMapper.selectList(q);
@@ -267,7 +298,9 @@ public class FocusServiceImpl implements IFocusService {
         FocusSessionResData r = new FocusSessionResData();
         r.setSessionId(s.getId());
         r.setHabitId(s.getHabitId());
+        r.setFocusMode(StringUtils.isBlank(s.getFocusMode()) ? MODE_COUNTDOWN : s.getFocusMode());
         r.setPlannedMinutes(s.getPlannedMinutes());
+        r.setTargetMinutes(s.getTargetMinutes());
         r.setActualSeconds(s.getActualSeconds());
         r.setStatus(s.getStatus());
         r.setStartTime(s.getStartTime());
