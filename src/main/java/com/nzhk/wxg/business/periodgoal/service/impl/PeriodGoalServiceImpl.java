@@ -158,6 +158,45 @@ public class PeriodGoalServiceImpl implements IPeriodGoalService {
     }
 
     @Override
+    public void removeHabitReference(String userId, String habitId) {
+        if (StringUtils.isBlank(userId) || StringUtils.isBlank(habitId)) {
+            return;
+        }
+        LambdaQueryWrapper<PeriodGoal> w = new LambdaQueryWrapper<>();
+        w.eq(PeriodGoal::getUserId, userId).eq(PeriodGoal::getStatus, 1);
+        List<PeriodGoal> rows = periodGoalMapper.selectList(w);
+        if (CollectionUtils.isEmpty(rows)) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (PeriodGoal row : rows) {
+            List<String> ids = parseHabitIdsJson(row.getHabitIds());
+            if (CollectionUtils.isEmpty(ids) || ids.stream().noneMatch(habitId::equals)) {
+                continue;
+            }
+            List<String> next = ids.stream().filter(id -> !habitId.equals(id)).collect(Collectors.toList());
+            LambdaQueryWrapper<PeriodGoal> rowScope = new LambdaQueryWrapper<>();
+            rowScope.eq(PeriodGoal::getId, row.getId()).eq(PeriodGoal::getUserId, userId).eq(PeriodGoal::getStatus, 1);
+            if (next.isEmpty()) {
+                periodGoalMapper.delete(rowScope);
+                continue;
+            }
+            String habitJson;
+            try {
+                habitJson = JSON.writeValueAsString(next);
+            } catch (Exception e) {
+                log.warn("serialize habit ids failed goalId={}", row.getId(), e);
+                continue;
+            }
+            row.setHabitIds(habitJson);
+            row.setUpdatedAt(now);
+            LambdaUpdateWrapper<PeriodGoal> uw = new LambdaUpdateWrapper<>();
+            uw.eq(PeriodGoal::getId, row.getId()).eq(PeriodGoal::getUserId, userId).eq(PeriodGoal::getStatus, 1);
+            periodGoalMapper.update(row, uw);
+        }
+    }
+
+    @Override
     public void delete(String userId, PeriodGoalDeleteReqData data) {
         if (data == null || StringUtils.isBlank(data.getId())) {
             throw new BizException(40000, "缺少目标ID");

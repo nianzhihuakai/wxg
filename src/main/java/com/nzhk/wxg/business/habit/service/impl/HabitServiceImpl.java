@@ -8,6 +8,7 @@ import com.nzhk.wxg.business.habit.entity.Habit;
 import com.nzhk.wxg.business.habit.service.IHabitService;
 import com.nzhk.wxg.business.habit.utils.StreakCalculator;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
+import com.nzhk.wxg.business.periodgoal.service.IPeriodGoalService;
 import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.utils.BeanConvertUtil;
@@ -47,6 +48,9 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Resource
     private HabitCheckInMapper habitCheckInMapper;
+
+    @Resource
+    private IPeriodGoalService periodGoalService;
 
     @Override
     public List<HabitListResData> getHabits(HabitListReqData data) {
@@ -341,6 +345,13 @@ public class HabitServiceImpl extends ServiceImpl<HabitMapper, Habit> implements
 
     @Override
     public void deleteHabit(UpdateHabitReqData data) {
+        if (StringUtils.isBlank(data.getHabitId())) {
+            return;
+        }
+        Habit habit = baseMapper.selectById(data.getHabitId());
+        if (habit != null && StringUtils.isNotBlank(habit.getUserId())) {
+            periodGoalService.removeHabitReference(habit.getUserId(), data.getHabitId());
+        }
         LambdaUpdateWrapper<HabitCheckIn> habitCheckInLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         habitCheckInLambdaUpdateWrapper.eq(HabitCheckIn::getHabitId, data.getHabitId());
         habitCheckInMapper.delete(habitCheckInLambdaUpdateWrapper);

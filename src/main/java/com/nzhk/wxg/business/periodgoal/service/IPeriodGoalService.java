@@ -17,4 +17,7 @@ public interface IPeriodGoalService {
     PeriodGoalSaveResData save(String userId, PeriodGoalSaveReqData data);
 
     void delete(String userId, PeriodGoalDeleteReqData data);
+
+    /** 从该用户所有有效周期目标的 habitIds 中移除指定习惯（删除习惯时调用）；若移除后无关联习惯则删除整条目标 */
+    void removeHabitReference(String userId, String habitId);
 }
