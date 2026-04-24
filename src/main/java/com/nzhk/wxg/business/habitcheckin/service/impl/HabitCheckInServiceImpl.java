@@ -18,8 +18,13 @@ import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.HabitRankItem;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInAggregateItem;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInDateItem;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInRankItemResData;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
+import com.nzhk.wxg.business.habitcheckin.entity.UserRankSnapshot;
 import com.nzhk.wxg.business.habitcheckin.service.IHabitCheckInService;
+import com.nzhk.wxg.business.habitcheckin.service.UserRankSnapshotAsyncService;
 import com.nzhk.wxg.common.cache.ContextCache;
 import com.nzhk.wxg.common.exception.BizException;
 import com.nzhk.wxg.common.utils.FileSignUtil;
@@ -27,6 +32,7 @@ import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.NzhkDateUtil;
 import com.nzhk.wxg.mapper.HabitCheckInMapper;
 import com.nzhk.wxg.mapper.HabitMapper;
+import com.nzhk.wxg.mapper.UserRankSnapshotMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -53,6 +59,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, HabitCheckIn> implements IHabitCheckInService {
+    private static final int USER_RANK_LIMIT = 100;
 
     @Resource
     private HabitMapper habitMapper;
@@ -66,6 +73,12 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
     @Resource
     private FileSignUtil fileSignUtil;
 
+    @Resource
+    private UserRankSnapshotMapper userRankSnapshotMapper;
+
+    @Resource
+    private UserRankSnapshotAsyncService userRankSnapshotAsyncService;
+
     @Override
     public void checkIn(CheckInReqData data) {
         log.info("checkIn userId:{}, habitId:{}", ContextCache.getUserId(), data != null ? data.getHabitId() : null);
@@ -77,6 +90,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         habitCheckIn.setCheckInTime(LocalDateTime.now());
         habitCheckIn.setCheckInType(1);
         baseMapper.insert(habitCheckIn);
+        userRankSnapshotAsyncService.refreshSingleUserRankSnapshotAsync(ContextCache.getUserId());
     }
 
     @Override
@@ -111,6 +125,7 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
             baseMapper.delete(habitCheckInLambdaUpdateWrapper);
         }
         habitService.updateStreak(data.getHabitId());
+        userRankSnapshotAsyncService.refreshSingleUserRankSnapshotAsync(ContextCache.getUserId());
     }
 
     @Override
@@ -445,5 +460,123 @@ public class HabitCheckInServiceImpl extends ServiceImpl<HabitCheckInMapper, Hab
         }).toList();
         res.setRecords(items);
         return res;
+    }
+
+    @Override
+    public List<UserCheckInRankItemResData> getUserCheckInRank(String rankType) {
+        String rankTypeValue = StringUtils.trimToEmpty(rankType).toLowerCase(Locale.ROOT);
+        List<UserCheckInRankItemResData> rankList;
+        if ("count".equals(rankTypeValue)) {
+            rankList = userRankSnapshotMapper.selectRankByCount(USER_RANK_LIMIT);
+        } else if ("streak".equals(rankTypeValue)) {
+            rankList = userRankSnapshotMapper.selectRankByMomentum(USER_RANK_LIMIT);
+        } else {
+            rankList = userRankSnapshotMapper.selectRankByDays(USER_RANK_LIMIT);
+        }
+        if (CollectionUtils.isEmpty(rankList)) {
+            recalibrateUserRankSnapshots();
+            if ("count".equals(rankTypeValue)) {
+                rankList = userRankSnapshotMapper.selectRankByCount(USER_RANK_LIMIT);
+            } else if ("streak".equals(rankTypeValue)) {
+                rankList = userRankSnapshotMapper.selectRankByMomentum(USER_RANK_LIMIT);
+            } else {
+                rankList = userRankSnapshotMapper.selectRankByDays(USER_RANK_LIMIT);
+            }
+        }
+        if (CollectionUtils.isEmpty(rankList)) {
+            return Collections.emptyList();
+        }
+        for (int i = 0; i < rankList.size(); i++) {
+            UserCheckInRankItemResData item = rankList.get(i);
+            item.setRankNo(i + 1);
+            if (StringUtils.isNotBlank(item.getAvatarUrl())) {
+                item.setAvatarUrl(fileSignUtil.signFileUrlIfNeeded(item.getAvatarUrl()));
+            }
+            if (StringUtils.isBlank(item.getNickName())) {
+                item.setNickName("微信用户");
+            }
+            if (item.getRankValue() == null) {
+                item.setRankValue(0L);
+            }
+            if (item.getCurrentStreakDays() == null) {
+                item.setCurrentStreakDays(0);
+            }
+            if (item.getMaxStreakDays() == null) {
+                item.setMaxStreakDays(0);
+            }
+        }
+        return rankList;
+    }
+
+    @Override
+    public void recalibrateUserRankSnapshots() {
+        userRankSnapshotMapper.deleteAllSnapshots();
+        List<UserCheckInAggregateItem> aggregateItems = baseMapper.selectUserCheckInAggregateItems();
+        if (CollectionUtils.isEmpty(aggregateItems)) {
+            return;
+        }
+        List<UserCheckInDateItem> dateItems = baseMapper.selectUserCheckInDateItems();
+        Map<String, List<UserCheckInDateItem>> userDateMap = dateItems.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(UserCheckInDateItem::getUserId));
+        for (UserCheckInAggregateItem aggregateItem : aggregateItems) {
+            String userId = aggregateItem.getUserId();
+            if (StringUtils.isBlank(userId)) {
+                continue;
+            }
+            List<UserCheckInDateItem> userDateItems = userDateMap.getOrDefault(userId, Collections.emptyList());
+            upsertSnapshot(userId, aggregateItem, userDateItems);
+        }
+    }
+
+    private void refreshSingleUserRankSnapshot(String userId) {
+        if (StringUtils.isBlank(userId)) {
+            return;
+        }
+        LambdaQueryWrapper<HabitCheckIn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HabitCheckIn::getUserId, userId);
+        List<HabitCheckIn> records = baseMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(records)) {
+            userRankSnapshotMapper.deleteById(userId);
+            return;
+        }
+        Set<LocalDate> dateSet = records.stream()
+                .map(HabitCheckIn::getCheckInDate)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(TreeSet::new));
+        UserCheckInAggregateItem aggregateItem = new UserCheckInAggregateItem();
+        aggregateItem.setUserId(userId);
+        aggregateItem.setCheckInCount((long) records.size());
+        aggregateItem.setCheckInDays((long) dateSet.size());
+        List<UserCheckInDateItem> userDateItems = dateSet.stream().map(d -> {
+            UserCheckInDateItem item = new UserCheckInDateItem();
+            item.setUserId(userId);
+            item.setCheckInDate(d);
+            return item;
+        }).toList();
+        upsertSnapshot(userId, aggregateItem, userDateItems);
+    }
+
+    private void upsertSnapshot(String userId, UserCheckInAggregateItem aggregateItem, List<UserCheckInDateItem> userDateItems) {
+        List<LocalDate> distinctDates = userDateItems.stream()
+                .map(UserCheckInDateItem::getCheckInDate)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        int currentStreak = computeCurrentStreak(distinctDates);
+        int maxStreak = computeMaxStreak(distinctDates);
+        BigDecimal momentumScore = new BigDecimal(currentStreak).multiply(new BigDecimal("0.7"))
+                .add(new BigDecimal(maxStreak).multiply(new BigDecimal("0.3")));
+
+        UserRankSnapshot snapshot = new UserRankSnapshot();
+        snapshot.setUserId(userId);
+        snapshot.setCheckInDays(aggregateItem.getCheckInDays() == null ? 0 : aggregateItem.getCheckInDays().intValue());
+        snapshot.setCheckInCount(aggregateItem.getCheckInCount() == null ? 0 : aggregateItem.getCheckInCount().intValue());
+        snapshot.setCurrentStreakDays(currentStreak);
+        snapshot.setMaxStreakDays(maxStreak);
+        snapshot.setMomentumScore(momentumScore);
+        snapshot.setLastCheckInDate(distinctDates.isEmpty() ? null : distinctDates.get(distinctDates.size() - 1));
+        userRankSnapshotMapper.upsertSnapshot(snapshot);
     }
 }

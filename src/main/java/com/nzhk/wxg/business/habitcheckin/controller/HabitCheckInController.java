@@ -9,6 +9,8 @@ import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListResData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInRankItemResData;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInRankReqData;
 import com.nzhk.wxg.business.habitcheckin.service.IHabitCheckInService;
 import com.nzhk.wxg.common.info.RequestInfo;
 import com.nzhk.wxg.common.info.ResponseInfo;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * <p>
@@ -90,5 +94,22 @@ public class HabitCheckInController {
     public ResponseInfo<CheckInReflectionListResData> listReflections(@RequestBody RequestInfo<CheckInReflectionListReqData> requestInfo) {
         log.info("listReflections request");
         return ResponseInfo.success(habitCheckInService.listReflections(requestInfo.getData()));
+    }
+
+    @PostMapping("getUserCheckInRank")
+    public ResponseInfo<List<UserCheckInRankItemResData>> getUserCheckInRank(@RequestBody(required = false) RequestInfo<UserCheckInRankReqData> requestInfo) {
+        String rankType = requestInfo != null && requestInfo.getData() != null ? requestInfo.getData().getRankType() : null;
+        log.info("getUserCheckInRank request, rankType:{}", rankType);
+        return ResponseInfo.success(habitCheckInService.getUserCheckInRank(rankType));
+    }
+
+    /**
+     * 临时管理接口：手动触发用户排行预计算表全量校准
+     */
+    @PostMapping("admin/recalibrateUserRankSnapshots")
+    public ResponseInfo<Void> recalibrateUserRankSnapshots() {
+        log.info("admin recalibrateUserRankSnapshots request");
+        habitCheckInService.recalibrateUserRankSnapshots();
+        return ResponseInfo.success(null);
     }
 }

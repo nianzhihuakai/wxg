@@ -18,6 +18,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns("/**/login/**")
                 .excludePathPatterns("/file/access/**")
+                .excludePathPatterns("/habitCheckIn/admin/recalibrateUserRankSnapshots")
                 .excludePathPatterns("/revice", "/revice/**");
     }
 

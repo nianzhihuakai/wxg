@@ -10,7 +10,10 @@ import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionListResData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReflectionSaveReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.CheckInReqData;
 import com.nzhk.wxg.business.habitcheckin.bean.StatisticsInfoResData;
+import com.nzhk.wxg.business.habitcheckin.bean.UserCheckInRankItemResData;
 import com.nzhk.wxg.business.habitcheckin.entity.HabitCheckIn;
+
+import java.util.List;
 
 /**
  * <p>
@@ -39,4 +42,8 @@ public interface IHabitCheckInService extends IService<HabitCheckIn> {
     CheckInReflectionItemResData getReflection(CheckInReflectionGetReqData data);
 
     CheckInReflectionListResData listReflections(CheckInReflectionListReqData data);
+
+    List<UserCheckInRankItemResData> getUserCheckInRank(String rankType);
+
+    void recalibrateUserRankSnapshots();
 }

@@ -33,9 +33,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 @Service
 public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> implements IWxUserService {
+    private static final String DEFAULT_NICKNAME_PREFIX = "微习惯_";
+    private static final String NICKNAME_RANDOM_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+    private static final int NICKNAME_RANDOM_LENGTH = 8;
 
     String appid = "wxa46f1050fff7f28b";
     String secret = "275745dae4dda4a21b04497d7a3cdc9b";
@@ -65,12 +69,12 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
             String userId = wxUserLoginReqData.getUserId();
             log.info("login userId:{}", userId);
             if (StringUtils.isEmpty(userId)) {
-                wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
+                wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).nickName(generateDefaultNickName()).build();
                 wxUserMapper.insert(wxUser);
             } else {
                 WxUser wxUserSelect = baseMapper.selectById(userId);
                 if (null == wxUserSelect) {
-                    wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).build();
+                    wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).nickName(generateDefaultNickName()).build();
                     log.info("login wxUser:{}", wxUser.getId());
                     wxUserMapper.insert(wxUser);
                 } else {
@@ -90,6 +94,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
                     .set(WxUser::getSessionKey, sessionKey).set(WxUser::getUpdateTime, LocalDateTime.now());
             wxUserMapper.update(null, wxUserLambdaUpdateWrapper);
         }
+        wxUser = ensureUserNickName(wxUser);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", wxUser.getId());
@@ -119,16 +124,21 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     public WxUserLoginResData saveUserInfo(SaveUserInfoReqData data) {
         log.info("saveUserInfo userId:{}, nickName:{}", ContextCache.getUserId(), data != null ? data.getNickName() : null);
         String storedAvatarUrl = fileSignUtil.toStoredUrl(data != null ? data.getAvatarUrl() : null);
+        String nickName = StringUtils.trimToEmpty(data != null ? data.getNickName() : null);
+        if (StringUtils.isBlank(nickName)) {
+            nickName = generateDefaultNickName();
+        }
         LambdaUpdateWrapper<WxUser> wxUserLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
         wxUserLambdaUpdateWrapper.eq(WxUser::getId, ContextCache.getUserId())
-                .set(WxUser::getNickName, data.getNickName())
+                .set(WxUser::getNickName, nickName)
                 .set(WxUser::getAvatarUrl, storedAvatarUrl);
         baseMapper.update(null, wxUserLambdaUpdateWrapper);
 
         WxUser wxUser = baseMapper.selectById(ContextCache.getUserId());
+        wxUser = ensureUserNickName(wxUser);
 
         String avatarUrl = fileSignUtil.signFileUrlIfNeeded(storedAvatarUrl);
-        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(avatarUrl).nickName(data.getNickName()).build();
+        UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(avatarUrl).nickName(wxUser.getNickName()).build();
         return WxUserLoginResData.builder().userInfo(userInfo).build();
     }
 
@@ -139,6 +149,7 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         if (wxUser == null) {
             throw new BizException(40400, "用户不存在");
         }
+        wxUser = ensureUserNickName(wxUser);
         UserInfoResData res = BeanConvertUtil.copySingleProperties(wxUser, UserInfoResData::new);
         if (res != null && res.getAvatarUrl() != null) {
             res.setAvatarUrl(fileSignUtil.signFileUrlIfNeeded(res.getAvatarUrl()));
@@ -163,5 +174,27 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
             loginResVO = WxLoginResVO.builder().openId(jsonObject.getString("openid")).sessionKey(jsonObject.getString("session_key")).build();
         }
         return loginResVO;
+    }
+
+    private WxUser ensureUserNickName(WxUser wxUser) {
+        if (wxUser == null || StringUtils.isNotBlank(wxUser.getNickName())) {
+            return wxUser;
+        }
+        String nickName = generateDefaultNickName();
+        LambdaUpdateWrapper<WxUser> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(WxUser::getId, wxUser.getId())
+                .set(WxUser::getNickName, nickName);
+        baseMapper.update(null, updateWrapper);
+        wxUser.setNickName(nickName);
+        return wxUser;
+    }
+
+    private String generateDefaultNickName() {
+        StringBuilder code = new StringBuilder(NICKNAME_RANDOM_LENGTH);
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int i = 0; i < NICKNAME_RANDOM_LENGTH; i++) {
+            code.append(NICKNAME_RANDOM_CHARS.charAt(random.nextInt(NICKNAME_RANDOM_CHARS.length())));
+        }
+        return DEFAULT_NICKNAME_PREFIX + code;
     }
 }
