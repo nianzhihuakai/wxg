@@ -5,11 +5,15 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nzhk.wxg.business.habit.entity.Habit;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountItemResData;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeReqData;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeResData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalDeleteReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalGetReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalItemResData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalListReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalListResData;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalPeriodCountRow;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalSaveReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalSaveResData;
 import com.nzhk.wxg.business.periodgoal.entity.PeriodGoal;
@@ -76,6 +80,39 @@ public class PeriodGoalServiceImpl implements IPeriodGoalService {
         List<PeriodGoal> rows = periodGoalMapper.selectList(w);
         PeriodGoalListResData res = new PeriodGoalListResData();
         res.setList(rows.stream().map(this::toItem).collect(Collectors.toList()));
+        return res;
+    }
+
+    @Override
+    public PeriodGoalCountsInRangeResData countsInRange(String userId, PeriodGoalCountsInRangeReqData data) {
+        if (data == null) {
+            throw new BizException(40000, "参数为空");
+        }
+        if (!isValidPeriodType(data.getPeriodType())) {
+            throw new BizException(40000, "周期类型无效");
+        }
+        LocalDate rangeStart = parseDateRequired(data.getRangeStart(), "rangeStart");
+        LocalDate rangeEnd = parseDateRequired(data.getRangeEnd(), "rangeEnd");
+        if (rangeEnd.isBefore(rangeStart)) {
+            throw new BizException(40000, "rangeEnd 不能早于 rangeStart");
+        }
+        List<PeriodGoalPeriodCountRow> rows = periodGoalMapper.selectCountsGroupedByPeriod(
+                userId, data.getPeriodType(), rangeStart, rangeEnd);
+        PeriodGoalCountsInRangeResData res = new PeriodGoalCountsInRangeResData();
+        if (CollectionUtils.isEmpty(rows)) {
+            res.setCounts(Collections.emptyList());
+            return res;
+        }
+        List<PeriodGoalCountItemResData> out = new ArrayList<>();
+        for (PeriodGoalPeriodCountRow row : rows) {
+            PeriodGoalCountItemResData item = new PeriodGoalCountItemResData();
+            item.setPeriodStart(row.getPeriodStart() != null ? row.getPeriodStart().format(DATE_FMT) : null);
+            item.setPeriodEnd(row.getPeriodEnd() != null ? row.getPeriodEnd().format(DATE_FMT) : null);
+            long c = row.getCnt() == null ? 0L : row.getCnt();
+            item.setCount((int) Math.min(c, Integer.MAX_VALUE));
+            out.add(item);
+        }
+        res.setCounts(out);
         return res;
     }
 

@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,6 +49,28 @@ import java.util.stream.Collectors;
 public class JournalServiceImpl implements IJournalService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    /** 心情编码与文案（与小程序端一致）；mood_value 多个时用英文逗号拼接 */
+    private static final Map<String, String> JOURNAL_MOOD_CODE_TO_LABEL;
+
+    private static final int JOURNAL_MOOD_MAX_COUNT = 3;
+
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("happy", "开心");
+        m.put("calm", "平静");
+        m.put("excited", "期待");
+        m.put("tired", "疲惫");
+        m.put("anxious", "焦虑");
+        m.put("grateful", "感恩");
+        m.put("fulfilled", "充实");
+        m.put("motivated", "有干劲");
+        m.put("relaxed", "放松");
+        m.put("sad", "难过");
+        m.put("angry", "生气");
+        m.put("bored", "无聊");
+        JOURNAL_MOOD_CODE_TO_LABEL = Collections.unmodifiableMap(m);
+    }
 
     @Resource
     private JournalMapper journalMapper;
@@ -258,7 +281,12 @@ public class JournalServiceImpl implements IJournalService {
             wrapper.like(Journal::getContent, keyword.trim());
         }
         if (StringUtils.isNotBlank(moodValue)) {
-            wrapper.eq(Journal::getMoodValue, moodValue.trim());
+            String m = moodValue.trim();
+            // mood_value 可为逗号分隔多心情：匹配包含其中某一种编码的记录（PostgreSQL）
+            wrapper.and(w -> w.eq(Journal::getMoodValue, m)
+                    .or().likeRight(Journal::getMoodValue, m + ",")
+                    .or().likeLeft(Journal::getMoodValue, "," + m)
+                    .or().like(Journal::getMoodValue, "," + m + ","));
         }
         if (StringUtils.isNotBlank(dateStart)) {
             LocalDate start = parseDate(dateStart);
@@ -312,8 +340,7 @@ public class JournalServiceImpl implements IJournalService {
     private byte[] buildPdf(String userId, String month, List<Journal> journals) {
         try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
             com.lowagie.text.Document document = new com.lowagie.text.Document(com.lowagie.text.PageSize.A4, 54, 54, 54, 54);
-            com.lowagie.text.pdf.PdfWriter.getInstance(document, baos);
-            document.open();
+            com.lowagie.text.pdf.PdfWriter writer = com.lowagie.text.pdf.PdfWriter.getInstance(document, baos);
             com.lowagie.text.pdf.BaseFont bf;
             try {
                 bf = com.lowagie.text.pdf.BaseFont.createFont("STSong-Light", "UniGB-UCS2-H", com.lowagie.text.pdf.BaseFont.NOT_EMBEDDED);
@@ -321,6 +348,10 @@ public class JournalServiceImpl implements IJournalService {
                 log.warn("Chinese font not available, using Helvetica", e);
                 bf = com.lowagie.text.pdf.BaseFont.createFont(com.lowagie.text.pdf.BaseFont.HELVETICA, com.lowagie.text.pdf.BaseFont.WINANSI, com.lowagie.text.pdf.BaseFont.NOT_EMBEDDED);
             }
+            String monthTitle = formatMonthTitle(month);
+            String footerMonthLine = monthTitle + " · WXG 日记";
+            writer.setPageEvent(new JournalExportPdfPageEvent(bf, footerMonthLine));
+            document.open();
             java.awt.Color titleColor = new java.awt.Color(45, 55, 72);
             java.awt.Color metaColor = new java.awt.Color(107, 114, 128);
             java.awt.Color contentColor = new java.awt.Color(75, 85, 99);
@@ -328,44 +359,59 @@ public class JournalServiceImpl implements IJournalService {
             com.lowagie.text.Font metaFont = new com.lowagie.text.Font(bf, 11, com.lowagie.text.Font.NORMAL, metaColor);
             com.lowagie.text.Font subjectFont = new com.lowagie.text.Font(bf, 14, com.lowagie.text.Font.BOLD, titleColor);
             com.lowagie.text.Font contentFont = new com.lowagie.text.Font(bf, 12, com.lowagie.text.Font.NORMAL, contentColor);
-            com.lowagie.text.Paragraph title = new com.lowagie.text.Paragraph(month + " 日记", titleFont);
+            com.lowagie.text.Font tocTitleFont = new com.lowagie.text.Font(bf, 16, com.lowagie.text.Font.BOLD, titleColor);
+            com.lowagie.text.Font tocItemFont = new com.lowagie.text.Font(bf, 10, com.lowagie.text.Font.NORMAL, metaColor);
+            com.lowagie.text.Paragraph title = new com.lowagie.text.Paragraph(monthTitle + " 日记", titleFont);
             title.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
             title.setSpacingAfter(8);
             document.add(title);
             String exportDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy年M月d日"));
             com.lowagie.text.Paragraph subTitle = new com.lowagie.text.Paragraph("导出日期：" + exportDate, metaFont);
             subTitle.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
-            subTitle.setSpacingAfter(20);
+            subTitle.setSpacingAfter(10);
             document.add(subTitle);
+            if (!CollectionUtils.isEmpty(journals)) {
+                com.lowagie.text.Paragraph countLine = new com.lowagie.text.Paragraph("共 " + journals.size() + " 篇", metaFont);
+                countLine.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+                countLine.setSpacingAfter(16);
+                document.add(countLine);
+            }
             com.lowagie.text.pdf.draw.LineSeparator sep = new com.lowagie.text.pdf.draw.LineSeparator();
             sep.setLineColor(new java.awt.Color(229, 231, 235));
             sep.setPercentage(100);
             sep.setLineWidth(0.5f);
             document.add(sep);
             document.add(new com.lowagie.text.Paragraph(" "));
-            Map<String, List<JournalImage>> imageMap = queryImagesForExport(userId, journals);
-            for (Journal j : journals) {
-                String dateStr = j.getJournalDate().format(DATE_FORMATTER);
-                String subject = StringUtils.defaultString(j.getSubject(), "");
-                String mood = StringUtils.defaultString(j.getMoodLabel(), j.getMoodValue());
-                String content = stripHtml(StringUtils.defaultString(j.getContent(), ""));
-                com.lowagie.text.Paragraph datePara = new com.lowagie.text.Paragraph(dateStr + "  ·  " + mood, metaFont);
-                datePara.setSpacingBefore(18);
-                datePara.setSpacingAfter(4);
-                document.add(datePara);
-                com.lowagie.text.Paragraph subjectPara = new com.lowagie.text.Paragraph(subject, subjectFont);
-                subjectPara.setSpacingAfter(8);
-                document.add(subjectPara);
-                if (StringUtils.isNotBlank(content)) {
-                    com.lowagie.text.Paragraph contentPara = new com.lowagie.text.Paragraph(content, contentFont);
-                    contentPara.setAlignment(com.lowagie.text.Element.ALIGN_JUSTIFIED);
-                    contentPara.setLeading(20);
-                    contentPara.setSpacingAfter(12);
-                    document.add(contentPara);
+            if (CollectionUtils.isEmpty(journals)) {
+                com.lowagie.text.Paragraph emptyTip = new com.lowagie.text.Paragraph("本月暂无日记", contentFont);
+                emptyTip.setAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+                emptyTip.setSpacingBefore(40);
+                document.add(emptyTip);
+            } else {
+                addJournalTableOfContents(document, journals, tocTitleFont, tocItemFont);
+                Map<String, List<JournalImage>> imageMap = queryImagesForExport(userId, journals);
+                for (Journal j : journals) {
+                    String dateStr = j.getJournalDate().format(DATE_FORMATTER);
+                    String subject = StringUtils.trimToNull(j.getSubject());
+                    String mood = StringUtils.defaultString(j.getMoodLabel(), j.getMoodValue());
+                    addJournalHeaderBlock(document, dateStr, mood, subject, metaFont, subjectFont);
+                    List<String> paragraphs = splitHtmlToParagraphTexts(StringUtils.defaultString(j.getContent(), ""));
+                    for (int i = 0; i < paragraphs.size(); i++) {
+                        String block = paragraphs.get(i);
+                        if (StringUtils.isBlank(block)) {
+                            continue;
+                        }
+                        com.lowagie.text.Paragraph contentPara = new com.lowagie.text.Paragraph(block, contentFont);
+                        contentPara.setAlignment(com.lowagie.text.Element.ALIGN_JUSTIFIED);
+                        contentPara.setLeading(20);
+                        boolean last = i == paragraphs.size() - 1;
+                        contentPara.setSpacingAfter(last ? 12 : 6);
+                        document.add(contentPara);
+                    }
+                    List<JournalImage> images = imageMap.getOrDefault(j.getId(), Collections.emptyList());
+                    addImagesToPdf(document, images);
+                    document.add(new com.lowagie.text.Paragraph(" "));
                 }
-                List<JournalImage> images = imageMap.getOrDefault(j.getId(), Collections.emptyList());
-                addImagesToPdf(document, images);
-                document.add(new com.lowagie.text.Paragraph(" "));
             }
             document.close();
             return baos.toByteArray();
@@ -375,15 +421,152 @@ public class JournalServiceImpl implements IJournalService {
         }
     }
 
-    private String stripHtml(String html) {
-        if (html == null) return "";
-        return html.replaceAll("<[^>]+>", " ")
-                .replaceAll("&nbsp;", " ")
-                .replaceAll("&lt;", "<")
-                .replaceAll("&gt;", ">")
-                .replaceAll("&amp;", "&")
-                .replaceAll("\\s+", " ")
-                .trim();
+    /**
+     * 将 yyyy-MM 转为「yyyy年M月」用于封面标题（与 footer 一致风格）。
+     */
+    private String formatMonthTitle(String month) {
+        if (StringUtils.isBlank(month)) {
+            return month;
+        }
+        try {
+            LocalDate first = LocalDate.parse(month + "-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            return first.getYear() + "年" + first.getMonthValue() + "月";
+        } catch (Exception e) {
+            return month;
+        }
+    }
+
+    private void addJournalTableOfContents(com.lowagie.text.Document document, List<Journal> journals,
+            com.lowagie.text.Font tocTitleFont, com.lowagie.text.Font tocItemFont) throws com.lowagie.text.DocumentException {
+        com.lowagie.text.Paragraph tocTitle = new com.lowagie.text.Paragraph("目录", tocTitleFont);
+        tocTitle.setSpacingAfter(10);
+        document.add(tocTitle);
+        for (Journal j : journals) {
+            String subj = StringUtils.isNotBlank(j.getSubject()) ? j.getSubject() : "（无标题）";
+            String line = j.getJournalDate().format(DATE_FORMATTER) + "    " + subj;
+            com.lowagie.text.Paragraph linePara = new com.lowagie.text.Paragraph(line, tocItemFont);
+            linePara.setLeading(15);
+            document.add(linePara);
+        }
+        document.add(new com.lowagie.text.Paragraph(" "));
+        com.lowagie.text.pdf.draw.LineSeparator tocSep = new com.lowagie.text.pdf.draw.LineSeparator();
+        tocSep.setLineColor(new java.awt.Color(229, 231, 235));
+        tocSep.setPercentage(100);
+        tocSep.setLineWidth(0.5f);
+        document.add(tocSep);
+        document.add(new com.lowagie.text.Paragraph(" "));
+    }
+
+    /**
+     * 日期单独一行、心情单独一行；表头使用 {@link com.lowagie.text.pdf.PdfPTable#setKeepTogether(boolean)}，减少日期与标题被分页拆开。
+     */
+    private void addJournalHeaderBlock(com.lowagie.text.Document document, String dateStr, String mood, String subject,
+            com.lowagie.text.Font metaFont, com.lowagie.text.Font subjectFont) throws com.lowagie.text.DocumentException {
+        com.lowagie.text.pdf.PdfPTable headerTable = new com.lowagie.text.pdf.PdfPTable(1);
+        headerTable.setWidthPercentage(100f);
+        headerTable.setSpacingBefore(18f);
+        headerTable.setKeepTogether(true);
+        com.lowagie.text.pdf.PdfPCell cell = new com.lowagie.text.pdf.PdfPCell();
+        cell.setBorder(com.lowagie.text.Rectangle.NO_BORDER);
+        cell.setPadding(0);
+        com.lowagie.text.Paragraph dateLine = new com.lowagie.text.Paragraph(dateStr, metaFont);
+        dateLine.setSpacingAfter(2);
+        cell.addElement(dateLine);
+        if (StringUtils.isNotBlank(mood)) {
+            com.lowagie.text.Paragraph moodLine = new com.lowagie.text.Paragraph(mood, metaFont);
+            moodLine.setSpacingAfter(6);
+            cell.addElement(moodLine);
+        }
+        if (StringUtils.isNotBlank(subject)) {
+            com.lowagie.text.Paragraph subjectLine = new com.lowagie.text.Paragraph(subject, subjectFont);
+            subjectLine.setSpacingAfter(8);
+            cell.addElement(subjectLine);
+        } else {
+            com.lowagie.text.Paragraph subjectLine = new com.lowagie.text.Paragraph("（无标题）", metaFont);
+            subjectLine.setSpacingAfter(8);
+            cell.addElement(subjectLine);
+        }
+        headerTable.addCell(cell);
+        document.add(headerTable);
+    }
+
+    /**
+     * 按 HTML 块级/换行拆成多段纯文本，避免整篇挤成一段。
+     */
+    private List<String> splitHtmlToParagraphTexts(String html) {
+        if (StringUtils.isBlank(html)) {
+            return Collections.emptyList();
+        }
+        String h = html;
+        h = h.replaceAll("(?i)<br\\s*/?>", "\n");
+        h = h.replaceAll("(?i)</div\\s*>", "\n");
+        h = h.replaceAll("(?i)<div[^>]*>", "");
+        h = h.replaceAll("(?i)</p\\s*>", "\n\n");
+        h = h.replaceAll("(?i)<p[^>]*>", "");
+        h = h.replaceAll("(?i)</li\\s*>", "\n");
+        h = h.replaceAll("(?i)<li[^>]*>", "· ");
+        h = h.replaceAll("<[^>]+>", " ");
+        h = decodeBasicHtmlEntities(h);
+        h = h.replaceAll("[ \t\f\r\u00a0]+", " ");
+        h = h.replaceAll(" *\n *", "\n");
+        h = h.replaceAll("\n{3,}", "\n\n");
+        String[] blocks = h.split("\n\n+");
+        List<String> out = new ArrayList<>();
+        for (String block : blocks) {
+            if (block == null) {
+                continue;
+            }
+            String normalized = block.replace('\n', ' ').replaceAll(" +", " ").trim();
+            if (StringUtils.isNotBlank(normalized)) {
+                out.add(normalized);
+            }
+        }
+        return out;
+    }
+
+    private String decodeBasicHtmlEntities(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&nbsp;", " ")
+                .replace("&#160;", " ")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'");
+    }
+
+    /**
+     * 校验 moodValue：1~3 个已知编码，英文逗号分隔；并规范化 moodValue、moodLabel 写入 data。
+     */
+    private void validateAndNormalizeJournalMoods(JournalSaveReqData data) {
+        String raw = data.getMoodValue();
+        if (StringUtils.isBlank(raw)) {
+            throw new BizException(40000, "moodValue 不能为空");
+        }
+        String[] split = raw.split(",");
+        List<String> codes = new ArrayList<>();
+        for (String part : split) {
+            String t = StringUtils.trimToNull(part);
+            if (t == null) {
+                continue;
+            }
+            if (!JOURNAL_MOOD_CODE_TO_LABEL.containsKey(t)) {
+                throw new BizException(40000, "moodValue 含有不支持的编码: " + t);
+            }
+            if (!codes.contains(t)) {
+                codes.add(t);
+            }
+        }
+        if (codes.isEmpty()) {
+            throw new BizException(40000, "moodValue 不能为空");
+        }
+        if (codes.size() > JOURNAL_MOOD_MAX_COUNT) {
+            throw new BizException(40000, "心情最多选择 " + JOURNAL_MOOD_MAX_COUNT + " 个");
+        }
+        data.setMoodValue(String.join(",", codes));
+        data.setMoodLabel(codes.stream().map(JOURNAL_MOOD_CODE_TO_LABEL::get).collect(Collectors.joining("、")));
     }
 
     private void validateSaveRequest(JournalSaveReqData data) {
@@ -393,9 +576,7 @@ public class JournalServiceImpl implements IJournalService {
         if (StringUtils.isBlank(data.getDate())) {
             throw new BizException(40000, "date 不能为空");
         }
-        if (StringUtils.isBlank(data.getMoodValue())) {
-            throw new BizException(40000, "moodValue 不能为空");
-        }
+        validateAndNormalizeJournalMoods(data);
         if (StringUtils.isBlank(data.getSubject())) {
             throw new BizException(40000, "subject 不能为空");
         }
@@ -579,14 +760,31 @@ public class JournalServiceImpl implements IJournalService {
         if (CollectionUtils.isEmpty(images)) {
             return;
         }
-        float maxCellW = 150f;
-        float maxCellH = 150f;
-        int cols = 3;
+        float contentWidth = document.right() - document.left();
+        if (contentWidth < 120f) {
+            contentWidth = 400f;
+        }
+        int imageCount = 0;
+        for (JournalImage img : images) {
+            if (img != null && StringUtils.isNotBlank(img.getFileId())) {
+                imageCount++;
+            }
+        }
+        if (imageCount == 0) {
+            return;
+        }
+        int cols = imageCount <= 2 ? 1 : 3;
+        float gutter = 8f;
+        float cellOuterW = (contentWidth - gutter * (cols - 1)) / cols;
+        float maxCellW = Math.max(60f, cellOuterW - 10f);
+        float maxCellH = cols == 1 ? Math.min(380f, maxCellW * 1.15f) : Math.min(200f, maxCellW * 0.95f);
         com.lowagie.text.pdf.PdfPTable table = new com.lowagie.text.pdf.PdfPTable(cols);
         table.setWidthPercentage(100f);
         table.setSpacingBefore(8);
         table.setSpacingAfter(8);
         table.setHorizontalAlignment(com.lowagie.text.Element.ALIGN_CENTER);
+        table.setSplitLate(true);
+        table.setSplitRows(false);
         int cellsAdded = 0;
         for (JournalImage img : images) {
             if (img == null || StringUtils.isBlank(img.getFileId())) {
@@ -656,5 +854,65 @@ public class JournalServiceImpl implements IJournalService {
             imageMap.computeIfAbsent(image.getJournalId(), k -> new ArrayList<>()).add(imageResData);
         }
         return imageMap;
+    }
+
+    /**
+     * 每页底部显示「第 k / n 页」（n 为整份 PDF 总页数）与月份副标题；封面与正文可从同一页起排。
+     */
+    private static final class JournalExportPdfPageEvent extends com.lowagie.text.pdf.PdfPageEventHelper {
+
+        private static final float FOOTER_MAIN_SIZE = 9f;
+        private static final float FOOTER_SUB_SIZE = 8f;
+
+        private final com.lowagie.text.pdf.BaseFont bf;
+        private final String monthFooterLine;
+        private com.lowagie.text.pdf.PdfTemplate totalPagesTemplate;
+
+        JournalExportPdfPageEvent(com.lowagie.text.pdf.BaseFont bf, String monthFooterLine) {
+            this.bf = bf;
+            this.monthFooterLine = monthFooterLine;
+        }
+
+        @Override
+        public void onOpenDocument(com.lowagie.text.pdf.PdfWriter writer, com.lowagie.text.Document document) {
+            totalPagesTemplate = writer.getDirectContent().createTemplate(48, 20);
+        }
+
+        @Override
+        public void onEndPage(com.lowagie.text.pdf.PdfWriter writer, com.lowagie.text.Document document) {
+            int currentPage = writer.getPageNumber();
+            String prefix = "第 " + currentPage + " 页 / ";
+            com.lowagie.text.pdf.PdfContentByte cb = writer.getDirectContent();
+            float centerX = (document.left() + document.right()) / 2f;
+            float yMain = document.bottom() - 22f;
+            float ySub = document.bottom() - 36f;
+            float prefixW = bf.getWidthPoint(prefix, FOOTER_MAIN_SIZE);
+            float startX = centerX - prefixW / 2f - 10f;
+            cb.saveState();
+            cb.setColorFill(new java.awt.Color(107, 114, 128));
+            cb.beginText();
+            cb.setFontAndSize(bf, FOOTER_MAIN_SIZE);
+            cb.setTextMatrix(startX, yMain);
+            cb.showText(prefix);
+            cb.endText();
+            cb.addTemplate(totalPagesTemplate, startX + prefixW, yMain);
+            if (StringUtils.isNotBlank(monthFooterLine)) {
+                cb.beginText();
+                cb.setFontAndSize(bf, FOOTER_SUB_SIZE);
+                cb.showTextAligned(com.lowagie.text.Element.ALIGN_CENTER, monthFooterLine, centerX, ySub, 0);
+                cb.endText();
+            }
+            cb.restoreState();
+        }
+
+        @Override
+        public void onCloseDocument(com.lowagie.text.pdf.PdfWriter writer, com.lowagie.text.Document document) {
+            int total = Math.max(1, writer.getPageNumber());
+            totalPagesTemplate.beginText();
+            totalPagesTemplate.setFontAndSize(bf, FOOTER_MAIN_SIZE);
+            totalPagesTemplate.setTextMatrix(0, 3);
+            totalPagesTemplate.showText(String.valueOf(total));
+            totalPagesTemplate.endText();
+        }
     }
 }

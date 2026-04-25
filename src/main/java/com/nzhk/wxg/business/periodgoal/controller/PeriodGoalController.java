@@ -1,5 +1,7 @@
 package com.nzhk.wxg.business.periodgoal.controller;
 
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeReqData;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeResData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalDeleteReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalGetReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalItemResData;
@@ -41,6 +43,25 @@ public class PeriodGoalController {
             return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
         } catch (Exception e) {
             log.error("periodGoal list error", e);
+            return ResponseInfo.fail(50000, "服务器异常", null);
+        }
+    }
+
+    @PostMapping("/countsInRange")
+    public ResponseInfo<PeriodGoalCountsInRangeResData> countsInRange(
+            @RequestBody RequestInfo<PeriodGoalCountsInRangeReqData> requestInfo) {
+        try {
+            String userId = ContextCache.getUserId();
+            PeriodGoalCountsInRangeReqData data = requestInfo != null ? requestInfo.getData() : null;
+            log.info("periodGoal countsInRange userId:{} type:{} {}~{}", userId,
+                    data != null ? data.getPeriodType() : null,
+                    data != null ? data.getRangeStart() : null,
+                    data != null ? data.getRangeEnd() : null);
+            return ResponseInfo.success(periodGoalService.countsInRange(userId, data));
+        } catch (BizException e) {
+            return ResponseInfo.fail(e.getCode(), e.getMessage(), null);
+        } catch (Exception e) {
+            log.error("periodGoal countsInRange error", e);
             return ResponseInfo.fail(50000, "服务器异常", null);
         }
     }

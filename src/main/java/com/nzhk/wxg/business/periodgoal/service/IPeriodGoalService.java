@@ -1,5 +1,7 @@
 package com.nzhk.wxg.business.periodgoal.service;
 
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeReqData;
+import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalCountsInRangeResData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalDeleteReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalGetReqData;
 import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalItemResData;
@@ -11,6 +13,9 @@ import com.nzhk.wxg.business.periodgoal.bean.PeriodGoalSaveResData;
 public interface IPeriodGoalService {
 
     PeriodGoalListResData list(String userId, PeriodGoalListReqData data);
+
+    /** 时间窗内各自然周期目标条数（日历弹层一次拉取） */
+    PeriodGoalCountsInRangeResData countsInRange(String userId, PeriodGoalCountsInRangeReqData data);
 
     PeriodGoalItemResData get(String userId, PeriodGoalGetReqData data);
 
