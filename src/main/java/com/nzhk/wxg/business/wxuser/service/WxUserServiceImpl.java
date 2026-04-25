@@ -39,7 +39,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> implements IWxUserService {
     private static final String DEFAULT_NICKNAME_PREFIX = "微习惯_";
     private static final String NICKNAME_RANDOM_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-    private static final int NICKNAME_RANDOM_LENGTH = 8;
+    private static final int NICKNAME_RANDOM_LENGTH = 4;
 
     String appid = "wxa46f1050fff7f28b";
     String secret = "275745dae4dda4a21b04497d7a3cdc9b";
