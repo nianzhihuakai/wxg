@@ -194,7 +194,16 @@ public class FocusServiceImpl implements IFocusService {
                 .orderByDesc(FocusSession::getCreateTime)
                 .last("limit 1");
         FocusSession s = focusSessionMapper.selectOne(q);
-        return s == null ? null : toRes(s);
+        if (s == null) return null;
+
+        // 倒计时会话已过期时，自动结算，避免前端拿到过期的进行中状态
+        if (s.getStatus() == STATUS_RUNNING
+                && s.getExpectedEndTime() != null
+                && !s.getExpectedEndTime().isAfter(OffsetDateTime.now(ZONE))) {
+            autoFinishExpiredSession(s);
+            return null;
+        }
+        return toRes(s);
     }
 
     @Override
@@ -286,12 +295,73 @@ public class FocusServiceImpl implements IFocusService {
         focusSessionMapper.updateById(s);
     }
 
+    @Override
+    public int cancelInactivePausedSessions(int inactiveHours) {
+        int hours = inactiveHours <= 0 ? 8 : inactiveHours;
+        OffsetDateTime now = OffsetDateTime.now(ZONE);
+        OffsetDateTime cutoff = now.minusHours(hours);
+
+        LambdaQueryWrapper<FocusSession> q = new LambdaQueryWrapper<>();
+        q.eq(FocusSession::getStatus, STATUS_PAUSED)
+                .isNotNull(FocusSession::getPauseStartTime)
+                .le(FocusSession::getPauseStartTime, cutoff);
+        List<FocusSession> candidates = focusSessionMapper.selectList(q);
+        if (candidates == null || candidates.isEmpty()) return 0;
+
+        int affected = 0;
+        for (FocusSession s : candidates) {
+            // 幂等保护：仅处理仍为 paused 的会话
+            FocusSession latest = focusSessionMapper.selectById(s.getId());
+            if (latest == null || latest.getStatus() == null || latest.getStatus() != STATUS_PAUSED) {
+                continue;
+            }
+            if (latest.getPauseStartTime() == null || latest.getPauseStartTime().isAfter(cutoff)) {
+                continue;
+            }
+
+            int pauseTotalSeconds = latest.getPauseTotalSeconds() == null ? 0 : latest.getPauseTotalSeconds();
+            int actualSeconds = 0;
+            if (latest.getStartTime() != null && latest.getPauseStartTime() != null) {
+                actualSeconds = (int) Math.max(
+                        0,
+                        ChronoUnit.SECONDS.between(latest.getStartTime(), latest.getPauseStartTime()) - pauseTotalSeconds
+                );
+            }
+
+            latest.setActualSeconds(actualSeconds);
+            latest.setEndTime(now);
+            latest.setStatus(STATUS_CANCELLED);
+            latest.setFinishType("auto_timeout");
+            latest.setPauseStartTime(null);
+            focusSessionMapper.updateById(latest);
+            affected++;
+        }
+        return affected;
+    }
+
     private FocusSession getMineSession(String sessionId) {
         if (StringUtils.isBlank(sessionId)) throw new BizException(40000, "sessionId不能为空");
         FocusSession s = focusSessionMapper.selectById(sessionId);
         if (s == null) throw new BizException(40000, "专注记录不存在");
         if (!ContextCache.getUserId().equals(s.getUserId())) throw new BizException(40000, "无权限操作该专注记录");
         return s;
+    }
+
+    private void autoFinishExpiredSession(FocusSession s) {
+        OffsetDateTime now = OffsetDateTime.now(ZONE);
+        int pauseTotalSeconds = s.getPauseTotalSeconds() == null ? 0 : s.getPauseTotalSeconds();
+        if (s.getStatus() == STATUS_PAUSED && s.getPauseStartTime() != null) {
+            pauseTotalSeconds += (int) Math.max(0, ChronoUnit.SECONDS.between(s.getPauseStartTime(), now));
+        }
+        int actualSeconds = (int) Math.max(0, ChronoUnit.SECONDS.between(s.getStartTime(), now) - pauseTotalSeconds);
+
+        s.setPauseTotalSeconds(pauseTotalSeconds);
+        s.setActualSeconds(actualSeconds);
+        s.setEndTime(now);
+        s.setStatus(STATUS_FINISHED);
+        s.setFinishType("auto");
+        s.setPauseStartTime(null);
+        focusSessionMapper.updateById(s);
     }
 
     private FocusSessionResData toRes(FocusSession s) {

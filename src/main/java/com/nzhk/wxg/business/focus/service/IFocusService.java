@@ -17,5 +17,6 @@ public interface IFocusService {
     void delete(FocusActionReqData data);
     List<FocusSession> listNeedRemind();
     void markRemindSent(String sessionId);
+    int cancelInactivePausedSessions(int inactiveHours);
 }
 
