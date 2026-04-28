@@ -4,8 +4,8 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.nzhk.wxg.business.habit.entity.Habit;
 import com.nzhk.wxg.business.habittype.entity.HabitType;
-import com.nzhk.wxg.business.habittype.service.IHabitTypeService;
 import com.nzhk.wxg.business.wxuser.bean.SaveUserInfoReqData;
 import com.nzhk.wxg.business.wxuser.bean.UserInfoResData;
 import com.nzhk.wxg.business.wxuser.bean.WxUserLoginReqData;
@@ -19,15 +19,17 @@ import com.nzhk.wxg.common.utils.BeanConvertUtil;
 import com.nzhk.wxg.common.utils.FileSignUtil;
 import com.nzhk.wxg.common.utils.IdUtil;
 import com.nzhk.wxg.common.utils.JwtUtil;
+import com.nzhk.wxg.mapper.HabitMapper;
 import com.nzhk.wxg.mapper.HabitTypeMapper;
 import com.nzhk.wxg.mapper.WxUserMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -40,6 +42,8 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     private static final String DEFAULT_NICKNAME_PREFIX = "微习惯_";
     private static final String NICKNAME_RANDOM_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
     private static final int NICKNAME_RANDOM_LENGTH = 4;
+    private static final String DEFAULT_HABIT_NAME = "每日自律打卡";
+    private static final String DEFAULT_LIFE_TYPE_NAME = "生活";
 
     String appid = "wxa46f1050fff7f28b";
     String secret = "275745dae4dda4a21b04497d7a3cdc9b";
@@ -52,12 +56,13 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
     @Resource
     private HabitTypeMapper habitTypeMapper;
     @Resource
-    private IHabitTypeService habitTypeService;
+    private HabitMapper habitMapper;
 
     @Resource
     private FileSignUtil fileSignUtil;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public WxUserLoginResData login(WxUserLoginReqData wxUserLoginReqData) {
         WxLoginResVO loginResVO = getOpenid(wxUserLoginReqData.getCode());
         String openId = loginResVO.getOpenId();
@@ -65,18 +70,21 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
 
         WxUser wxUser = wxUserMapper.selectByOpenId(openId);
         log.info("login openId:{}", openId);
+        boolean isNewUser = false;
         if (null == wxUser) {
             String userId = wxUserLoginReqData.getUserId();
             log.info("login userId:{}", userId);
             if (StringUtils.isEmpty(userId)) {
                 wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).nickName(generateDefaultNickName()).build();
                 wxUserMapper.insert(wxUser);
+                isNewUser = true;
             } else {
                 WxUser wxUserSelect = baseMapper.selectById(userId);
                 if (null == wxUserSelect) {
                     wxUser = WxUser.builder().id(IdUtil.getId()).openid(openId).sessionKey(sessionKey).nickName(generateDefaultNickName()).build();
                     log.info("login wxUser:{}", wxUser.getId());
                     wxUserMapper.insert(wxUser);
+                    isNewUser = true;
                 } else {
                     wxUser = wxUserSelect;
                     log.info("login wxUserSelect.getId():{}", wxUserSelect.getId());
@@ -102,20 +110,9 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
         String avatarUrl = fileSignUtil.signFileUrlIfNeeded(wxUser.getAvatarUrl());
         UserInfo userInfo = UserInfo.builder().id(wxUser.getId()).avatarUrl(avatarUrl).nickName(wxUser.getNickName()).build();
 
-        LambdaQueryWrapper<HabitType> habitTypeLambdaQueryWrapper = new LambdaQueryWrapper<>();
-        habitTypeLambdaQueryWrapper.eq(HabitType::getUserId, userInfo.getId());
-        List<HabitType> habitTypes = habitTypeMapper.selectList(habitTypeLambdaQueryWrapper);
-        if (CollectionUtils.isEmpty(habitTypes)) {
-            List<String> typeList = Arrays.asList("生活", "健身", "学习");
-            for (int i = 0; i < typeList.size(); i++) {
-                String typeName =  typeList.get(i);
-                HabitType habitType = new HabitType();
-                habitType.setId(IdUtil.getId());
-                habitType.setName(typeName);
-                habitType.setUserId(userInfo.getId());
-                habitType.setSortOrder(i+1);
-                habitTypeMapper.insert(habitType);
-            }
+        if (isNewUser) {
+            HabitType lifeType = initDefaultHabitTypes(userInfo.getId());
+            createDefaultHabit(userInfo.getId(), lifeType.getId());
         }
         return WxUserLoginResData.builder().token(token).userInfo(userInfo).build();
     }
@@ -196,5 +193,46 @@ public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> impleme
             code.append(NICKNAME_RANDOM_CHARS.charAt(random.nextInt(NICKNAME_RANDOM_CHARS.length())));
         }
         return DEFAULT_NICKNAME_PREFIX + code;
+    }
+
+    private HabitType initDefaultHabitTypes(String userId) {
+        List<String> typeList = Arrays.asList("生活", "健身", "学习");
+        HabitType lifeType = null;
+        for (int i = 0; i < typeList.size(); i++) {
+            String typeName = typeList.get(i);
+            HabitType habitType = new HabitType();
+            habitType.setId(IdUtil.getId());
+            habitType.setName(typeName);
+            habitType.setUserId(userId);
+            habitType.setSortOrder(i + 1);
+            habitTypeMapper.insert(habitType);
+            if (DEFAULT_LIFE_TYPE_NAME.equals(typeName)) {
+                lifeType = habitType;
+            }
+        }
+        if (lifeType == null) {
+            throw new BizException(50000, "默认分类初始化失败");
+        }
+        return lifeType;
+    }
+
+    private void createDefaultHabit(String userId, String lifeHabitTypeId) {
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(21);
+        Habit habit = new Habit();
+        habit.setId(IdUtil.getId());
+        habit.setUserId(userId);
+        habit.setHabitTypeId(lifeHabitTypeId);
+        habit.setName(DEFAULT_HABIT_NAME);
+        habit.setStartDate(startDate);
+        habit.setEndDate(endDate);
+        habit.setRemindFlag(false);
+        habit.setRemindTime(null);
+        habit.setCheckInFrequencyType("fixed");
+        habit.setCheckInFrequency("1,2,3,4,5,6,7");
+        habit.setPromptCheckinReflection(false);
+        habit.setStreakDays(0);
+        habit.setMaxStreakDays(0);
+        habitMapper.insert(habit);
     }
 }
