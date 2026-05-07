@@ -39,7 +39,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 @Service
 public class WxUserServiceImpl extends ServiceImpl<WxUserMapper, WxUser> implements IWxUserService {
-    private static final String DEFAULT_NICKNAME_PREFIX = "微习惯_";
+    private static final String DEFAULT_NICKNAME_PREFIX = "用户_";
     private static final String NICKNAME_RANDOM_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
     private static final int NICKNAME_RANDOM_LENGTH = 4;
     private static final String DEFAULT_HABIT_NAME = "每日自律打卡";
