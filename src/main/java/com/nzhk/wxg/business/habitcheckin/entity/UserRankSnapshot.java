@@ -1,6 +1,7 @@
 package com.nzhk.wxg.business.habitcheckin.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableId;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 @TableName("user_rank_snapshot")
 public class UserRankSnapshot {
 
+    @TableId("user_id")
     private String userId;
 
     private Integer checkInDays;
